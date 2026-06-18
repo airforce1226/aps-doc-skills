@@ -19,8 +19,10 @@ claude plugin marketplace add airforce1226/aps-doc-skills
 claude plugin install project-docs@aps-doc-skills
 ```
 
-Then invoke in a session: `/drafting-project-documents` or just ask
-"착수 보고서 초안 작성해줘".
+Then use it either way:
+
+- **Slash command:** `/draft-doc 착수 보고서` (optionally add a draft file path)
+- **Natural language:** just ask "착수 보고서 초안 작성해줘" (the skill auto-triggers)
 
 ## Requirements
 
