@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aps-doc-skills",
+  "description": "Skills for drafting Korean project documents (착수 보고서, 요구사항 정의서, 회의록) as styled .docx files.",
+  "owner": {
+    "name": "airforce1226",
+    "email": "dhkim3@apsystems.co.kr"
+  },
+  "plugins": [
+    {
+      "name": "project-docs",
+      "description": "Draft Korean project documents (착수 보고서, 요구사항 정의서, 회의록) as styled .docx files — from an existing draft or through conversation.",
+      "source": "./plugins/project-docs",
+      "category": "productivity"
+    }
+  ]
+}

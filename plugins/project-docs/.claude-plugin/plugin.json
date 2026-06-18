@@ -1,0 +1,13 @@
+{
+  "name": "project-docs",
+  "description": "Draft Korean project documents (착수 보고서, 요구사항 정의서, 회의록) as styled .docx files — from an existing draft or through conversation.",
+  "version": "0.1.0",
+  "author": {
+    "name": "airforce1226",
+    "email": "dhkim3@apsystems.co.kr"
+  },
+  "homepage": "https://github.com/airforce1226/aps-doc-skills",
+  "repository": "https://github.com/airforce1226/aps-doc-skills",
+  "license": "MIT",
+  "keywords": ["docx", "report", "korean", "project-management", "착수보고서", "요구사항정의서"]
+}
