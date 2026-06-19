@@ -30,6 +30,7 @@ Spec format (UTF-8 JSON):
 }
 
 값이 "TBD" 인 셀/문구는 회색 이탤릭(미정 표시)으로 렌더링된다.
+모든 run 에는 noProof 가 적용되어 Word 의 맞춤법(빨강)·문법(파랑) 검사 밑줄이 표시되지 않는다.
 """
 import json
 import sys
@@ -64,6 +65,10 @@ def build(spec, out_path):
         run.font.size = Pt(size)
         if color:
             run.font.color.rgb = color
+        # 맞춤법(빨강)·문법(파랑) 검사 밑줄 억제: 모든 run에 noProof 적용
+        rPr = run._element.get_or_add_rPr()
+        if rPr.find(qn("w:noProof")) is None:
+            rPr.append(OxmlElement("w:noProof"))
 
     def set_cell_bg(cell, color):
         tcPr = cell._tc.get_or_add_tcPr()

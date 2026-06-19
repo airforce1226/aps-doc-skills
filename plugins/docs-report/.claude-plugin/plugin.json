@@ -1,7 +1,7 @@
 {
   "name": "docs-report",
   "description": "Draft Korean project documents (착수 보고서, 요구사항 정의서, 회의록) as styled .docx files — from an existing draft or through conversation.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "airforce1226",
     "email": "dhkim3@apsystems.co.kr"
