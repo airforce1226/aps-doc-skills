@@ -8,9 +8,9 @@
   },
   "plugins": [
     {
-      "name": "project-docs",
+      "name": "docs-report",
       "description": "Draft Korean project documents (착수 보고서, 요구사항 정의서, 회의록) as styled .docx files — from an existing draft or through conversation.",
-      "source": "./plugins/project-docs",
+      "source": "./plugins/docs-report",
       "category": "productivity"
     },
     {
