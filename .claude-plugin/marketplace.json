@@ -12,6 +12,12 @@
       "description": "Draft Korean project documents (착수 보고서, 요구사항 정의서, 회의록) as styled .docx files — from an existing draft or through conversation.",
       "source": "./plugins/project-docs",
       "category": "productivity"
+    },
+    {
+      "name": "ppt-report",
+      "description": "Create Korean PPT reports (PPT 보고서) as .pptx via a docs-first workflow — build a source .docx, then derive the slide deck from it. Enforces IT전략팀 team rules.",
+      "source": "./plugins/ppt-report",
+      "category": "productivity"
     }
   ]
 }

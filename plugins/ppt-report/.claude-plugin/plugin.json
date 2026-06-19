@@ -1,0 +1,13 @@
+{
+  "name": "ppt-report",
+  "description": "Create Korean PPT reports (PPT 보고서) as .pptx via a docs-first workflow — build a source .docx, then derive the slide deck from it. Enforces IT전략팀 team rules.",
+  "version": "0.1.0",
+  "author": {
+    "name": "airforce1226",
+    "email": "dhkim3@apsystems.co.kr"
+  },
+  "homepage": "https://github.com/airforce1226/aps-doc-skills",
+  "repository": "https://github.com/airforce1226/aps-doc-skills",
+  "license": "MIT",
+  "keywords": ["pptx", "powerpoint", "report", "korean", "presentation", "PPT보고서", "착수보고서"]
+}
