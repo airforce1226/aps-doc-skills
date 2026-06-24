@@ -1,0 +1,13 @@
+{
+  "name": "design-ppt",
+  "description": "Render a Claude-Design-style HTML deck into a pixel-faithful Korean .pptx (each <section> = one 1920×1080 slide). Headless-Chrome render + full-bleed assembly. Enforces IT전략팀 team rules.",
+  "version": "0.1.0",
+  "author": {
+    "name": "airforce1226",
+    "email": "dhkim3@apsystems.co.kr"
+  },
+  "homepage": "https://github.com/airforce1226/aps-doc-skills",
+  "repository": "https://github.com/airforce1226/aps-doc-skills",
+  "license": "MIT",
+  "keywords": ["pptx", "powerpoint", "design", "html", "korean", "presentation", "PPT보고서", "claude-design"]
+}

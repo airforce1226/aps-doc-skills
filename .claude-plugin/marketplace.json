@@ -18,6 +18,12 @@
       "description": "Create Korean PPT reports (PPT 보고서) as .pptx via a docs-first workflow — build a source .docx, then derive the slide deck from it. Enforces IT전략팀 team rules.",
       "source": "./plugins/ppt-report",
       "category": "productivity"
+    },
+    {
+      "name": "design-ppt",
+      "description": "Render a Claude-Design-style HTML deck into a pixel-faithful Korean .pptx — each <section> becomes one 1920×1080 slide via headless-Chrome render + full-bleed assembly. Enforces IT전략팀 team rules.",
+      "source": "./plugins/design-ppt",
+      "category": "productivity"
     }
   ]
 }
