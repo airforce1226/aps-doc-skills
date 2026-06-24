@@ -35,7 +35,7 @@ SECTION_RE = re.compile(
 
 
 def _attr(attrs, name):
-    m = re.search(name + r'\s*=\s*"([^"]*)"', attrs)
+    m = re.search(re.escape(name) + r'\s*=\s*"([^"]*)"', attrs)
     return m.group(1) if m else ""
 
 
@@ -69,7 +69,9 @@ BROWSER_CANDIDATES = [
 
 def find_browser():
     override = os.environ.get("DESIGN_PPT_BROWSER")
-    if override and os.path.exists(override):
+    if override:
+        if not os.path.exists(override):
+            raise SystemExit("DESIGN_PPT_BROWSER 경로를 찾을 수 없습니다: %s" % override)
         return override
     for p in BROWSER_CANDIDATES:
         if os.path.exists(p):
@@ -90,12 +92,15 @@ def capture_slide(page_html_path, png_path, browser):
         "--screenshot=%s" % png_path,
         url,
     ]
-    subprocess.run(
-        cmd, check=True, timeout=120,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    result = subprocess.run(
+        cmd, check=False, timeout=120,
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
     )
-    if not os.path.exists(png_path):
-        raise SystemExit("렌더 실패: %s" % png_path)
+    if result.returncode != 0 or not os.path.exists(png_path):
+        err = result.stderr.decode(errors="replace").strip() if result.stderr else ""
+        raise SystemExit(
+            "Chrome 렌더 실패 (exit %d): %s" % (result.returncode, err or png_path)
+        )
 
 
 def _set_notes(slide, text):
@@ -103,6 +108,8 @@ def _set_notes(slide, text):
     tf.text = text
     for p in tf.paragraphs:
         for r in p.runs:
+            # _r is python-pptx's documented escape hatch to the lxml element;
+            # the public API has no language-tagging, so set lang=ko-KR directly.
             r._r.get_or_add_rPr().set("lang", "ko-KR")
 
 
@@ -110,7 +117,7 @@ def assemble_pptx(slides, out_path):
     prs = Presentation()
     prs.slide_width = SLIDE_W
     prs.slide_height = SLIDE_H
-    blank = prs.slide_layouts[6]
+    blank = prs.slide_layouts[6]  # index 6 = "Blank" in python-pptx's default template
     for item in slides:
         s = prs.slides.add_slide(blank)
         s.shapes.add_picture(item["png"], 0, 0, width=SLIDE_W, height=SLIDE_H)

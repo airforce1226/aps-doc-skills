@@ -89,3 +89,4 @@ def test_build_end_to_end(tmp_path):
     assert len(prs.slides) == 2
     assert prs.core_properties.author == "IT전략팀"
     assert prs.slides[0].has_notes_slide
+    assert "표지 노트" in prs.slides[0].notes_slide.notes_text_frame.text
