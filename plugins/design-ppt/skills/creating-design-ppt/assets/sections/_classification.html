@@ -1,0 +1,12 @@
+<!--
+  보안 분류 배지 (대외비/기밀/대내한/내부용 등) — APS 표준 스타일(적색 채움).
+  사용법:
+    1) 문서의 보안 등급을 반드시 확인한다. 해당하면 이 <div>를 각 <section> 안의
+       "맨 앞 자식"으로 붙여 넣는다 (모든 슬라이드에 일관 배치 — 한 장이라도 누락 금지).
+    2) 부모 <section>에 position:relative 가 있어야 우상단에 고정된다(전 아키타입 기본 포함).
+    3) "대외비" 글자만 실제 등급으로 교체한다.
+    4) 분류 대상이 아니면 의도적으로 생략한다 — "깜빡 누락"과 구분되도록 명시한다.
+-->
+<div style="position:absolute; top:40px; right:50px; z-index:5;
+            background:#c0392b; color:#fff; font-size:18px; font-weight:700;
+            letter-spacing:.14em; padding:6px 16px; border-radius:4px;">대외비</div>

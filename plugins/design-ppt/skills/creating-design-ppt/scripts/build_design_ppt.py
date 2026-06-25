@@ -109,8 +109,11 @@ def _set_notes(slide, text):
     for p in tf.paragraphs:
         for r in p.runs:
             # _r is python-pptx's documented escape hatch to the lxml element;
-            # the public API has no language-tagging, so set lang=ko-KR directly.
-            r._r.get_or_add_rPr().set("lang", "ko-KR")
+            # the public API has no language-tagging, so set the attrs directly.
+            rPr = r._r.get_or_add_rPr()
+            rPr.set("lang", "ko-KR")
+            # 검토 > 언어 > 맞춤법 검사 안 함 : disable spell/grammar check (noProof).
+            rPr.set("noProof", "1")
 
 
 def assemble_pptx(slides, out_path):

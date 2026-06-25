@@ -63,6 +63,15 @@ def test_assemble_pptx_fullbleed_notes_author(tmp_path):
     assert prs.core_properties.author == "IT전략팀"
     assert prs.slides[0].has_notes_slide
     assert "노트내용" in prs.slides[0].notes_slide.notes_text_frame.text
+    # 검토 > 언어 > 맞춤법 검사 안 함 : every notes run carries noProof + lang.
+    ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+    tf = prs.slides[0].notes_slide.notes_text_frame
+    runs = tf._txBody.findall(".//a:r", ns)
+    assert runs, "expected at least one notes run"
+    for r in runs:
+        rPr = r.find("a:rPr", ns)
+        assert rPr is not None and rPr.get("noProof") == "1"
+        assert rPr.get("lang") == "ko-KR"
     pic = prs.slides[0].shapes[0]
     assert pic.left == 0 and pic.top == 0
     assert pic.width == prs.slide_width
