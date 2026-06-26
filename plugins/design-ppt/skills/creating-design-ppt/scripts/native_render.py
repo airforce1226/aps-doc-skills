@@ -4,6 +4,7 @@
 Reads a deck.html section's computed layout (via headless Chrome --dump-dom)
 and emits editable python-pptx shapes instead of a baked screenshot.
 """
+import json
 import re
 
 from pptx.util import Emu
@@ -52,3 +53,77 @@ def snap_color(hex6, tol=12):
         if best_d is None or d < best_d:
             best, best_d = value, d
     return best if best_d is not None and best_d <= tol * 3 else target
+
+
+# Injected before </body>. Walks the DOM, classifies each node, emits layout JSON.
+MEASURE_JS = r"""
+<script>
+(function(){
+  function firstFont(f){ return (f||'').split(',')[0].replace(/["']/g,'').trim(); }
+  function hasElementChildren(el){
+    for (var i=0;i<el.children.length;i++){
+      var c=el.children[i], s=getComputedStyle(c);
+      if (s.display!=='none' && c.getBoundingClientRect().width>0) return true;
+    }
+    return false;
+  }
+  function role(el, cs){
+    var hint=el.getAttribute('data-ppt'); if(hint) return hint;
+    var tag=el.tagName.toLowerCase();
+    if(tag==='table') return 'table';
+    if(tag==='img'||tag==='svg'||tag==='canvas') return 'raster';
+    var r=el.getBoundingClientRect();
+    var grad=(cs.backgroundImage||'').indexOf('gradient')>=0;
+    if((r.height<=6 || r.width<=6) && (grad || cs.backgroundColor!=='rgba(0, 0, 0, 0)')) return 'rule';
+    var txt=(el.textContent||'').trim();
+    if(txt && !hasElementChildren(el)) return 'text';
+    if(cs.backgroundColor!=='rgba(0, 0, 0, 0)' || cs.borderTopWidth!=='0px'
+       || (cs.borderRadius && cs.borderRadius!=='0px')) return 'box';
+    return 'skip';
+  }
+  var out=[], all=document.querySelectorAll('section *');
+  for(var i=0;i<all.length;i++){
+    var el=all[i], cs=getComputedStyle(el);
+    if(cs.display==='none'||cs.visibility==='hidden') continue;
+    var ro=role(el,cs); if(ro==='skip') continue;
+    var r=el.getBoundingClientRect();
+    if(r.width<=0||r.height<=0) continue;
+    var node={role:ro, x:r.left, y:r.top, w:r.width, h:r.height,
+      color:cs.color, bg:cs.backgroundColor, grad:cs.backgroundImage,
+      align:cs.textAlign, font:firstFont(cs.fontFamily), sizePx:parseFloat(cs.fontSize),
+      weight:cs.fontWeight, ls:cs.letterSpacing,
+      radius:parseFloat(cs.borderTopLeftRadius)||0};
+    if(ro==='text'){ node.text=(el.textContent||'').trim(); }
+    if(ro==='table'){
+      var rows=[];
+      el.querySelectorAll('tr').forEach(function(tr){
+        var cells=[];
+        tr.querySelectorAll('th,td').forEach(function(td){
+          var tcs=getComputedStyle(td);
+          cells.push({text:(td.textContent||'').trim(), bg:tcs.backgroundColor,
+            color:tcs.color, weight:tcs.fontWeight, align:tcs.textAlign,
+            header:td.tagName.toLowerCase()==='th'});
+        });
+        rows.push(cells);
+      });
+      node.rows=rows;
+    }
+    out.push(node);
+  }
+  var pre=document.createElement('pre'); pre.id='__layout__';
+  pre.textContent=JSON.stringify(out); document.body.appendChild(pre);
+})();
+</script>
+"""
+
+_PRE_RE = re.compile(r'<pre id="__layout__">(.*?)</pre>', re.DOTALL)
+
+
+def extract_layout(dom_text):
+    m = _PRE_RE.search(dom_text)
+    if not m:
+        raise SystemExit("native 모드: __layout__ JSON을 dump-dom에서 찾지 못했습니다.")
+    raw = m.group(1)
+    # dump-dom HTML-escapes &, <, > inside <pre>; undo before JSON parse.
+    raw = raw.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return json.loads(raw)

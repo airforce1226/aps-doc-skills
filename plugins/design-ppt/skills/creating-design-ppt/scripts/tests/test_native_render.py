@@ -24,3 +24,28 @@ def test_snap_color_exact_and_near():
     assert nr.snap_color("0B1B3A") == "0B1B3A"          # exact token
     assert nr.snap_color("0C1C3B") == "0B1B3A"          # within tolerance -> navy
     assert nr.snap_color("00FF00", tol=5) == "00FF00"   # far -> unchanged
+
+
+def test_extract_layout_parses_pre_json():
+    dom = (
+        '<html><body><section></section>'
+        '<pre id="__layout__">[{"role":"text","x":120,"y":300,"w":714,"h":138,'
+        '"text":"\\uc81c\\ubaa9","font":"\\"Malgun Gothic\\"","sizePx":104,'
+        '"weight":"800","color":"rgb(255, 255, 255)","align":"left"}]</pre>'
+        '</body></html>'
+    )
+    nodes = nr.extract_layout(dom)
+    assert len(nodes) == 1
+    assert nodes[0]["role"] == "text"
+    assert nodes[0]["x"] == 120 and nodes[0]["w"] == 714
+    assert nodes[0]["text"] == "제목"
+
+
+def test_extract_layout_missing_pre_raises():
+    import pytest
+    with pytest.raises(SystemExit):
+        nr.extract_layout("<html><body>no pre here</body></html>")
+
+
+def test_measure_js_is_nonempty_string():
+    assert isinstance(nr.MEASURE_JS, str) and "__layout__" in nr.MEASURE_JS
