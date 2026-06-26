@@ -312,7 +312,7 @@ def crop_node_png(section_png, node, out_path):
 
 
 def add_raster(slide, node, section_png, tmp_dir, idx):
-    out = str(Path(tmp_dir) / ("raster_%d.png" % idx))
+    out = str(Path(tmp_dir) / ("raster_%s.png" % idx))
     crop_node_png(section_png, node, out)
     return slide.shapes.add_picture(out, px_to_emu(node["x"]), px_to_emu(node["y"]),
                                     px_to_emu(node["w"]), px_to_emu(node["h"]))
@@ -334,7 +334,9 @@ def render_slide(slide, nodes, section_png, tmp_dir, si):
             add_table(slide, node); counts["native"] += 1
         elif role == "raster":
             if section_png:
-                add_raster(slide, node, section_png, tmp_dir, len(slide.shapes))
+                # Scope the temp filename per slide so rasters never collide across slides.
+                add_raster(slide, node, section_png, tmp_dir,
+                           "%02d_%d" % (si, counts["raster"]))
                 counts["raster"] += 1
     return counts
 
@@ -359,7 +361,7 @@ def build_native(deck_path, out_path, css=None, browser=None):
         for si, sec in enumerate(sections):
             page = os.path.join(tmp, "slide_%02d.html" % si)
             wrapped = b.wrap_section_page(sec["html"], css).replace(
-                "</body>", MEASURE_JS + "</body>")
+                "</body>", MEASURE_JS + "</body>", 1)
             Path(page).write_text(wrapped, encoding="utf-8")
             nodes = extract_layout(dump_dom(page, browser))
             section_png = None
