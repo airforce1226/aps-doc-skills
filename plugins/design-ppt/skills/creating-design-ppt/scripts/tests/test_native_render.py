@@ -7,7 +7,7 @@ import native_render as nr
 
 
 def test_px_to_pt():
-    assert nr.px_to_pt(104) == 56.16  # 104 * 0.54
+    assert nr.px_to_pt(104) == 52.0  # 104 * 0.5  (1920px == 960pt)
 
 
 def test_px_to_emu_full_width():
@@ -84,7 +84,7 @@ def test_add_text_creates_editable_textbox(tmp_path):
     assert shp.has_text_frame
     assert shp.text_frame.paragraphs[0].runs[0].text == "제목"
     assert shp.text_frame.paragraphs[0].runs[0].font.bold is True
-    assert round(shp.text_frame.paragraphs[0].runs[0].font.size.pt, 2) == 56.16
+    assert round(shp.text_frame.paragraphs[0].runs[0].font.size.pt, 2) == 52.0
 
 
 def test_add_box_solid_fill(tmp_path):
@@ -221,3 +221,80 @@ def test_build_native_end_to_end(tmp_path):
             return False
 
     assert any(_is_full_bleed(s) and _navy_fill(s) for s in shapes)
+
+
+def _slide():
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    return prs.slides.add_slide(prs.slide_layouts[6])
+
+
+def test_add_text_sets_noproof_on_every_run():
+    # 검토>언어>맞춤법 검사 안 함: every run carries noProof + ko-KR.
+    node = {"role": "text", "x": 0, "y": 0, "w": 800, "h": 60, "text": "한 줄\n두 줄",
+            "font": "맑은 고딕", "sizePx": 40, "weight": "400",
+            "color": "rgb(11, 27, 58)", "align": "left", "ls": "normal"}
+    shp = nr.add_text(_slide(), node)
+    runs = [r for p in shp.text_frame.paragraphs for r in p.runs]
+    assert len(runs) == 2  # <br> -> "\n" -> two paragraphs/lines
+    for r in runs:
+        rPr = r._r.get_or_add_rPr()
+        assert rPr.get("noProof") == "1"
+        assert rPr.get("lang") == "ko-KR"
+
+
+def test_add_text_single_line_disables_wrap():
+    # A one-line label (h ~ one line) must not word-wrap (footer 2-line bug).
+    label = {"role": "text", "x": 0, "y": 0, "w": 240, "h": 26, "text": "APS · Turn on the APS ON",
+             "font": "맑은 고딕", "sizePx": 20, "weight": "400",
+             "color": "rgb(154,166,184)", "align": "left", "ls": "normal"}
+    assert nr.add_text(_slide(), label).text_frame.word_wrap is False
+    para = {"role": "text", "x": 0, "y": 0, "w": 800, "h": 300, "text": "긴 본문",
+            "font": "맑은 고딕", "sizePx": 29, "weight": "400",
+            "color": "rgb(38,53,79)", "align": "left", "ls": "normal"}
+    assert nr.add_text(_slide(), para).text_frame.word_wrap is True
+
+
+def test_add_text_centered_badge():
+    from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+    node = {"role": "text", "x": 1776, "y": 40, "w": 94, "h": 36, "text": "대외비",
+            "font": "맑은 고딕", "sizePx": 18, "weight": "700",
+            "color": "rgb(192,57,43)", "align": "left", "ls": "2.52px", "center": True}
+    tf = nr.add_text(_slide(), node).text_frame
+    assert tf.vertical_anchor == MSO_ANCHOR.MIDDLE
+    assert tf.paragraphs[0].alignment == PP_ALIGN.CENTER
+
+
+def test_add_box_uniform_border_only_no_fill():
+    # 대외비 badge: transparent body + red uniform outline.
+    node = {"role": "box", "x": 1776, "y": 40, "w": 94, "h": 36,
+            "bg": "rgba(0, 0, 0, 0)", "grad": "none", "radius": 4,
+            "bw": 2, "bc": "rgb(192, 57, 43)", "bUniform": True}
+    shp = nr.add_box(_slide(), node)
+    from pptx.enum.dml import MSO_FILL
+    assert shp.fill.type == MSO_FILL.BACKGROUND          # no body fill
+    assert str(shp.line.color.rgb) == "C0392B"           # red outline drawn
+
+
+def test_add_box_single_side_border_not_stroked():
+    # border-top divider must NOT become a full rectangle outline.
+    node = {"role": "box", "x": 0, "y": 0, "w": 400, "h": 200,
+            "bg": "rgba(0, 0, 0, 0)", "grad": "none", "radius": 0,
+            "bw": 3, "bc": "rgb(11, 63, 209)", "bUniform": False}
+    shp = nr.add_box(_slide(), node)
+    assert shp.line.fill.type is not None  # accessible; no solid outline forced
+
+
+def test_letter_spacing_centi_pt():
+    assert nr._letter_spacing_centi_pt("6.16px") == 308   # 6.16 * 0.5 * 100
+    assert nr._letter_spacing_centi_pt("normal") is None
+    assert nr._letter_spacing_centi_pt(None) is None
+
+
+def test_measure_js_has_inline_text_folding():
+    # The DOM-walk must preserve <br> and fold inline-only blocks (full text), and
+    # split space-between footers (own-text guard).
+    for token in ("hasOwnText", "inlineOnly", "richText", "colspan"):
+        assert token in nr.MEASURE_JS

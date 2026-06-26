@@ -15,7 +15,7 @@ from PIL import Image
 
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
@@ -23,7 +23,7 @@ from pptx.util import Emu, Pt
 # (12192000 x 6858000), so px_to_emu(1) == 6350 exactly (12192000 / 1920).
 SLIDE_W_EMU = 12192000
 SLIDE_H_EMU = 6858000
-PX_TO_PT = 0.54  # design canvas px -> slide pt
+PX_TO_PT = 0.5  # design canvas px -> slide pt (1920px == 960pt == 13.333in)
 
 # Single source of truth for color snapping — mirrors assets/design-tokens.md.
 PALETTE = {
@@ -74,20 +74,50 @@ def snap_color(hex6, tol=12):
 MEASURE_JS = r"""
 <script>
 (function(){
+  // Inline/phrasing tags that may sit *inside* a single text block (e.g. a heading
+  // with an emphasised <span>, or a <h1> with a <br>). An element whose only element
+  // children are inline is rendered as ONE textbox holding its full text — otherwise
+  // the surrounding non-inline text would be dropped on the floor.
+  var INLINE={SPAN:1,STRONG:1,B:1,I:1,EM:1,CODE:1,A:1,SUP:1,SUB:1,BR:1,SMALL:1,U:1,MARK:1,FONT:1,WBR:1};
   function firstFont(f){ return (f||'').split(',')[0].replace(/["']/g,'').trim(); }
-  function hasElementChildren(el){
+  function inlineOnly(el){
     for (var i=0;i<el.children.length;i++){
       var c=el.children[i], s=getComputedStyle(c);
-      if (s.display!=='none' && c.getBoundingClientRect().width>0) return true;
+      if (s.display==='none') continue;
+      if (c.tagName==='BR') continue;
+      if (c.getBoundingClientRect().width<=0 && c.getBoundingClientRect().height<=0) continue;
+      if (!INLINE[c.tagName]) return false;
+    }
+    return true;
+  }
+  // True only if the element holds its OWN direct text (not just text inside child
+  // spans). A heading "디스크... <span>강조</span>" folds into one block; a
+  // space-between footer with two bare <span>s does NOT — its spans stay separate
+  // so each keeps its own position/alignment.
+  function hasOwnText(el){
+    for (var i=0;i<el.childNodes.length;i++){
+      var n=el.childNodes[i];
+      if (n.nodeType===3 && n.textContent.trim()) return true;
     }
     return false;
   }
+  // Full text of an element with <br> preserved as newlines (PowerPoint line breaks).
+  function richText(el){
+    var clone=el.cloneNode(true);
+    var brs=clone.querySelectorAll('br');
+    for (var i=0;i<brs.length;i++){ brs[i].parentNode.replaceChild(document.createTextNode('\n'), brs[i]); }
+    return (clone.textContent||'').replace(/ /g,' ').replace(/[ \t]*\n[ \t]*/g,'\n').trim();
+  }
   function opaque(c){ return !!c && c!=='transparent' && c.indexOf('rgba(0, 0, 0, 0)')<0; }
   function baseNode(role, el, cs, r){
+    var bw=parseFloat(cs.borderTopWidth)||0;
+    var uniform = bw>0 && cs.borderTopWidth===cs.borderRightWidth
+      && cs.borderTopWidth===cs.borderBottomWidth && cs.borderTopWidth===cs.borderLeftWidth;
     return {role:role, x:r.left, y:r.top, w:r.width, h:r.height,
       color:cs.color, bg:cs.backgroundColor, grad:cs.backgroundImage,
       align:cs.textAlign, font:firstFont(cs.fontFamily), sizePx:parseFloat(cs.fontSize),
-      weight:cs.fontWeight, ls:cs.letterSpacing, radius:parseFloat(cs.borderTopLeftRadius)||0};
+      weight:cs.fontWeight, ls:cs.letterSpacing, radius:parseFloat(cs.borderTopLeftRadius)||0,
+      bw:bw, bc:cs.borderTopColor, bUniform:uniform};
   }
   function tableNode(el, cs, r){
     var node=baseNode('table', el, cs, r), rows=[];
@@ -95,16 +125,24 @@ MEASURE_JS = r"""
       var cells=[];
       tr.querySelectorAll('th,td').forEach(function(td){
         var tcs=getComputedStyle(td);
-        cells.push({text:(td.textContent||'').trim(), bg:tcs.backgroundColor,
+        var cell={text:richText(td), bg:tcs.backgroundColor,
           color:tcs.color, weight:tcs.fontWeight, align:tcs.textAlign,
-          header:td.tagName.toLowerCase()==='th'});
+          header:td.tagName.toLowerCase()==='th'};
+        cells.push(cell);
+        // Expand colspan into empty placeholder cells so columns stay aligned.
+        var span=parseInt(td.getAttribute('colspan')||'1',10);
+        for(var s=1;s<span;s++) cells.push({text:'', bg:tcs.backgroundColor,
+          color:tcs.color, weight:tcs.fontWeight, align:tcs.textAlign,
+          header:cell.header});
       });
       rows.push(cells);
     });
     node.rows=rows; return node;
   }
-  function textNode(el, cs, r){ var n=baseNode('text', el, cs, r); n.text=(el.textContent||'').trim(); return n; }
+  function textNode(el, cs, r, text){ var n=baseNode('text', el, cs, r); n.text=(text!=null?text:richText(el)); return n; }
+  function centeredText(el, cs, r, text){ var n=textNode(el, cs, r, text); n.center=true; return n; }
   var out=[];
+  var consumed=new Set();  // descendants already folded into a parent text block
   var sec=document.querySelector('section');
   if(sec){
     var scs=getComputedStyle(sec), sr=sec.getBoundingClientRect();
@@ -112,31 +150,36 @@ MEASURE_JS = r"""
   }
   var all=document.querySelectorAll('section *');
   for(var i=0;i<all.length;i++){
-    var el=all[i], cs=getComputedStyle(el);
+    var el=all[i];
+    if(consumed.has(el)) continue;
+    var cs=getComputedStyle(el);
     if(cs.display==='none'||cs.visibility==='hidden') continue;
     var r=el.getBoundingClientRect();
     if(r.width<=0||r.height<=0) continue;
     var tag=el.tagName.toLowerCase();
-    var txt=(el.textContent||'').trim();
-    var isLeaf = !!txt && !hasElementChildren(el);
+    var txt=richText(el);
+    var isText = !!txt && inlineOnly(el) && hasOwnText(el);
     var grad=(cs.backgroundImage||'').indexOf('gradient')>=0;
     var thin = r.height<=6 || r.width<=6;
     var filled = opaque(cs.backgroundColor);
     var bordered = cs.borderTopWidth!=='0px' && cs.borderTopWidth!=='0';
+    function eatChildren(){ var d=el.querySelectorAll('*'); for(var k=0;k<d.length;k++) consumed.add(d[k]); }
     var hint=el.getAttribute('data-ppt');
     if(hint){
-      if(hint==='skip') continue;
-      if(hint==='table'){ out.push(tableNode(el,cs,r)); continue; }
-      if(hint==='text'){ out.push(textNode(el,cs,r)); continue; }
-      if(hint==='rule'||hint==='raster'){ out.push(baseNode(hint,el,cs,r)); continue; }
-      if(hint==='box'){ out.push(baseNode('box',el,cs,r)); if(isLeaf) out.push(textNode(el,cs,r)); continue; }
+      if(hint==='skip'){ eatChildren(); continue; }
+      if(hint==='table'){ out.push(tableNode(el,cs,r)); eatChildren(); continue; }
+      if(hint==='text'){ out.push(textNode(el,cs,r,txt)); eatChildren(); continue; }
+      if(hint==='rule'||hint==='raster'){ out.push(baseNode(hint,el,cs,r)); eatChildren(); continue; }
+      if(hint==='box'){ out.push(baseNode('box',el,cs,r)); if(isText){ out.push(centeredText(el,cs,r,txt)); eatChildren(); } continue; }
       // unknown hint -> fall through to heuristics
     }
-    if(tag==='table'){ out.push(tableNode(el,cs,r)); continue; }
-    if(tag==='img'||tag==='svg'||tag==='canvas'){ out.push(baseNode('raster',el,cs,r)); continue; }
+    if(tag==='table'){ out.push(tableNode(el,cs,r)); eatChildren(); continue; }
+    if(tag==='img'||tag==='svg'||tag==='canvas'){ out.push(baseNode('raster',el,cs,r)); eatChildren(); continue; }
     if(thin && (grad||filled)){ out.push(baseNode('rule',el,cs,r)); continue; }
-    if(filled||bordered) out.push(baseNode('box',el,cs,r));   // box AND ...
-    if(isLeaf) out.push(textNode(el,cs,r));                    // ... text, if both
+    var selfBox = filled||bordered;
+    if(selfBox) out.push(baseNode('box',el,cs,r));   // box AND ...
+    // A filled/bordered leaf that holds its own text is a badge/chip -> center it.
+    if(isText){ out.push(selfBox ? centeredText(el,cs,r,txt) : textNode(el,cs,r,txt)); eatChildren(); }
   }
   var pre=document.createElement('pre'); pre.id='__layout__';
   pre.textContent=JSON.stringify(out); document.body.appendChild(pre);
@@ -190,23 +233,58 @@ def _is_bold(weight):
         return weight == "bold"
 
 
+def _letter_spacing_centi_pt(ls):
+    """CSS letter-spacing (e.g. '6.16px') -> python-pptx spc (hundredths of a point)."""
+    if not ls:
+        return None
+    m = re.match(r"^(-?[\d.]+)px$", str(ls).strip())
+    if not m:
+        return None
+    centi = int(round(float(m.group(1)) * PX_TO_PT * 100))
+    return centi if centi else None
+
+
+def _no_proof(run):
+    # 검토 > 언어 > 교정 언어 설정 > "맞춤법 검사 안 함" : tag every run ko-KR + noProof.
+    rPr = run._r.get_or_add_rPr()
+    rPr.set("lang", "ko-KR")
+    rPr.set("noProof", "1")
+
+
 def add_text(slide, node):
     box = slide.shapes.add_textbox(px_to_emu(node["x"]), px_to_emu(node["y"]),
                                    px_to_emu(node["w"]), px_to_emu(node["h"]))
     tf = box.text_frame
-    tf.word_wrap = True
-    tf.vertical_anchor = MSO_ANCHOR.TOP
+    text = node.get("text", "")
+    # Single-line labels (≈ one line tall, no break) must NOT wrap — PowerPoint's
+    # 맑은 고딕 is wider than Chrome's measurement, so a tight footer/label box would
+    # otherwise spill onto a 2nd line. Multi-line / tall boxes keep wrapping.
+    multiline = ("\n" in text) or (float(node["h"]) > float(node["sizePx"]) * 1.7)
+    tf.word_wrap = bool(multiline)
+    tf.auto_size = MSO_AUTO_SIZE.NONE
+    centered = bool(node.get("center"))
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE if centered else MSO_ANCHOR.TOP
     tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-    p = tf.paragraphs[0]
-    p.alignment = _ALIGN.get(node.get("align"), PP_ALIGN.LEFT)
-    run = p.add_run()
-    run.text = node.get("text", "")
-    run.font.name = node.get("font") or "맑은 고딕"
-    run.font.size = Pt(px_to_pt(node["sizePx"]))
-    run.font.bold = _is_bold(node.get("weight"))
+    align = PP_ALIGN.CENTER if centered else _ALIGN.get(node.get("align"), PP_ALIGN.LEFT)
+    name = node.get("font") or "맑은 고딕"
+    size = Pt(px_to_pt(node["sizePx"]))
+    bold = _is_bold(node.get("weight"))
     hexc = snap_color(rgb_to_hex(node.get("color")))
-    if hexc:
-        run.font.color.rgb = RGBColor.from_string(hexc)
+    spc = _letter_spacing_centi_pt(node.get("ls"))
+    # <br> in the source became "\n" — render each as its own line (paragraph).
+    for li, line in enumerate(text.split("\n")):
+        p = tf.paragraphs[0] if li == 0 else tf.add_paragraph()
+        p.alignment = align
+        run = p.add_run()
+        run.text = line
+        run.font.name = name
+        run.font.size = size
+        run.font.bold = bold
+        if hexc:
+            run.font.color.rgb = RGBColor.from_string(hexc)
+        if spc is not None:
+            run.font._rPr.set("spc", str(spc))
+        _no_proof(run)
     return box
 
 
@@ -217,7 +295,6 @@ def _add_rect(slide, node, rounded=False):
     shape_type = MSO_SHAPE.ROUNDED_RECTANGLE if rounded else MSO_SHAPE.RECTANGLE
     shp = slide.shapes.add_shape(shape_type, px_to_emu(node["x"]), px_to_emu(node["y"]),
                                  px_to_emu(node["w"]), px_to_emu(node["h"]))
-    shp.line.fill.background()  # no border by default
     shp.shadow.inherit = False
     return shp
 
@@ -231,6 +308,15 @@ def add_box(slide, node):
         shp.fill.fore_color.rgb = RGBColor.from_string(snap_color(hexc))
     else:
         shp.fill.background()
+    # Only a *uniform* border becomes an outline (e.g. the 대외비 badge: border-only,
+    # no fill). Single-side rules (border-top dividers) are left un-stroked here.
+    bw = float(node.get("bw") or 0)
+    bc = rgb_to_hex(node.get("bc"))
+    if node.get("bUniform") and bw > 0 and bc:
+        shp.line.color.rgb = RGBColor.from_string(snap_color(bc))
+        shp.line.width = Pt(max(px_to_pt(bw), 0.75))
+    else:
+        shp.line.fill.background()
     return shp
 
 
@@ -257,6 +343,7 @@ def _set_gradient(shp, stops):
 
 def add_rule(slide, node):
     shp = _add_rect(slide, node, rounded=False)
+    shp.line.fill.background()
     stops = [rgb_to_hex(s) for s in _GRAD_STOP_RE.findall(node.get("grad") or "")]
     if len(stops) >= 2:
         _set_gradient(shp, stops)
@@ -272,7 +359,7 @@ _NUM_RE = re.compile(r"^-?[\d,]+(\.\d+)?$")
 _CELL_MARGIN = Emu(45720)  # 0.05 in
 
 
-def _cell_text(cell, text, *, color, bold, align):
+def _cell_text(cell, text, *, color, bold, align, size_pt):
     cell.margin_left = cell.margin_right = _CELL_MARGIN
     tf = cell.text_frame
     tf.word_wrap = True
@@ -281,9 +368,10 @@ def _cell_text(cell, text, *, color, bold, align):
     run = p.add_run()
     run.text = text
     run.font.name = "맑은 고딕"
-    run.font.size = Pt(SIZE_BODY_PT)
+    run.font.size = Pt(size_pt)
     run.font.bold = bold
     run.font.color.rgb = RGBColor.from_string(color)
+    _no_proof(run)
 
 
 def add_table(slide, node):
@@ -296,10 +384,11 @@ def add_table(slide, node):
     tbl = gf.table
     tbl.first_row = False      # we style cells explicitly; disable built-in banding
     tbl.horz_banding = False
+    cell_pt = px_to_pt(node.get("sizePx") or 28)
     for ri, row in enumerate(rows):
         is_header = ri == 0 or any(c.get("header") for c in row)
-        first_text = (row[0].get("text") if row else "") or ""
-        is_total = first_text.strip() in ("합계", "계", "소계", "Total")
+        first_text = ((row[0].get("text") if row else "") or "").strip()
+        is_total = first_text in ("합계", "계", "소계", "Total") or first_text.endswith("합계")
         for ci in range(ncols):
             cell = tbl.cell(ri, ci)
             data = row[ci] if ci < len(row) else {"text": ""}
@@ -319,7 +408,7 @@ def add_table(slide, node):
             cell.fill.solid()
             cell.fill.fore_color.rgb = RGBColor.from_string(bg)
             align = PP_ALIGN.RIGHT if (numeric and not is_header) else PP_ALIGN.LEFT
-            _cell_text(cell, text, color=fg, bold=bold, align=align)
+            _cell_text(cell, text, color=fg, bold=bold, align=align, size_pt=cell_pt)
     return gf
 
 

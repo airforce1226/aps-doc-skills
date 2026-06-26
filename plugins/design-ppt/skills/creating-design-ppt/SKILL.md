@@ -68,7 +68,7 @@ The same `deck.html` builds two ways — pick per deliverable:
 4. **Verify** — reopen with python-pptx; confirm slide count and
    `core_properties.author == "IT전략팀"`. 네이티브 모드면 텍스트/표/도형이 **picture가 아닌
    실제 개체**인지(예: `shape.has_text_frame` / `has_table`) 확인한다. 보안 분류 대상이면
-   **모든** 슬라이드에 배지가 있는지 확인한다(노트 텍스트는 빌드 시 `noProof` 자동 처리됨).
+   **모든** 슬라이드에 배지가 있는지 확인한다(슬라이드 본문·표의 모든 텍스트 run + 노트가 빌드 시 `noProof` 자동 처리됨).
 5. **Report done** — give the file path and slide count.
 
 ## Team Rules (enforced — do not deviate)
@@ -78,8 +78,10 @@ The same `deck.html` builds two ways — pick per deliverable:
 | Author = **IT전략팀** (never a person's name) | `build_design_ppt.py` hard-codes `core_properties.author`. |
 | Filename: spaces, **no underscores**, version suffix last | e.g. `착수 보고서 v1.0.pptx`. Pass this exact path to the script. |
 | Don't invent unknowns | Use `(미정 — 추후 확정)` in the slide text. |
+| **개조식 작성 (구어체 금지)** | 슬라이드 본문은 **명사형 종결**의 개조식으로 쓴다. `~있었습니다/~합니다/~됩니다` 같은 구어체(합쇼체) 종결어미 금지 → `~잔존/~점유/~정상화` 처럼 명사형으로 맺는다. |
 | **보안 분류 누락 금지** | 대외비/기밀 등 해당 시 `_classification.html` 배지를 전 슬라이드에 배치. 비해당이면 의도적 생략을 명시. |
-| 맞춤법 검사 비활성(noProof) | `build_design_ppt.py` 가 발표자 노트 모든 run 에 `noProof="1"` 설정 (검토>언어>맞춤법 검사 안 함). |
+| 보안 배지 = 빨강 **테두리만·정중앙** | `_classification.html` 배지는 채움 없이 적색 테두리(2px)·적색 글자, 텍스트는 박스 정중앙. 네이티브 빌드 시 `native_render.py`가 테두리 박스 + 중앙 정렬 텍스트로 생성한다(채움 X). |
+| 맞춤법 검사 비활성(noProof) | `native_render.py`(슬라이드 본문·표 **모든** 텍스트 run)와 `build_design_ppt.py`(발표자 노트)가 `lang="ko-KR"` + `noProof="1"` 설정 (검토>언어>교정 언어 설정>맞춤법 검사 안 함). |
 
 ## Prerequisites
 
