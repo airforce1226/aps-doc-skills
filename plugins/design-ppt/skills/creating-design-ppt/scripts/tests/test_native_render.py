@@ -163,3 +163,38 @@ def test_render_slide_dispatches_and_counts(tmp_path):
     counts = nr.render_slide(slide, nodes, section_png=None, tmp_dir=str(tmp_path), si=0)
     assert counts["native"] == 2 and counts["raster"] == 0
     assert any(s.has_text_frame for s in slide.shapes)
+
+
+import pytest
+
+
+def _browser_available():
+    import build_design_ppt as b
+    try:
+        b.find_browser(); return True
+    except SystemExit:
+        return False
+
+
+@pytest.mark.skipif(not _browser_available(), reason="no Chrome/Edge installed")
+def test_build_native_end_to_end(tmp_path):
+    from pptx import Presentation
+    deck = tmp_path / "deck.html"
+    deck.write_text(
+        '<section data-label="표지" data-speaker-notes="노트" '
+        'style="width:1920px;height:1080px;position:relative;background:#0b1b3a;">'
+        '<div data-ppt="text" style="position:absolute;left:120px;top:300px;'
+        'font-size:104px;font-weight:800;color:#fff;font-family:\'Malgun Gothic\';">제목</div>'
+        '<div data-ppt="rule" style="position:absolute;left:120px;top:460px;width:60px;'
+        'height:4px;background:linear-gradient(90deg,#BED600,#2BA6CB);"></div>'
+        '</section>', encoding="utf-8")
+    out = tmp_path / "표지 v1.0.pptx"
+    nr.build_native(str(deck), str(out), css="html,body{margin:0}")
+
+    prs = Presentation(str(out))
+    assert len(prs.slides) == 1
+    assert prs.core_properties.author == "IT전략팀"
+    shapes = prs.slides[0].shapes
+    assert any(s.has_text_frame and "제목" in s.text_frame.text for s in shapes)
+    # No full-bleed picture: native mode must not bake a screenshot.
+    assert not any(s.shape_type == 13 for s in shapes)  # 13 = PICTURE
