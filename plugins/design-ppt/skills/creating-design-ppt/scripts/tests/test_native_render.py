@@ -85,3 +85,30 @@ def test_add_text_creates_editable_textbox(tmp_path):
     assert shp.text_frame.paragraphs[0].runs[0].text == "제목"
     assert shp.text_frame.paragraphs[0].runs[0].font.bold is True
     assert round(shp.text_frame.paragraphs[0].runs[0].font.size.pt, 2) == 56.16
+
+
+def test_add_box_solid_fill(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    node = {"role": "box", "x": 0, "y": 0, "w": 1920, "h": 1080,
+            "bg": "rgb(11, 27, 58)", "grad": "none", "radius": 0}
+    shp = nr.add_box(slide, node)
+    assert str(shp.fill.fore_color.rgb) == "0B1B3A"
+    assert shp.line.fill.type is not None  # no exception accessing line
+
+
+def test_add_rule_gradient_has_gradfill(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    node = {"role": "rule", "x": 120, "y": 460, "w": 60, "h": 4,
+            "grad": "linear-gradient(90deg, rgb(190, 214, 0), rgb(43, 166, 203))",
+            "bg": "rgba(0, 0, 0, 0)", "radius": 0}
+    shp = nr.add_rule(slide, node)
+    ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+    assert shp._element.spPr.find("a:gradFill", ns) is not None

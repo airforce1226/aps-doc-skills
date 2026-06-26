@@ -10,7 +10,9 @@ import subprocess
 from pathlib import Path
 
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
 # Standard 16:9 slide = 13.333" x 7.5". Exact EMU per 작업지시서 §3
@@ -184,3 +186,60 @@ def add_text(slide, node):
     if hexc:
         run.font.color.rgb = RGBColor.from_string(hexc)
     return box
+
+
+_GRAD_STOP_RE = re.compile(r"rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)")
+
+
+def _add_rect(slide, node, rounded=False):
+    shape_type = MSO_SHAPE.ROUNDED_RECTANGLE if rounded else MSO_SHAPE.RECTANGLE
+    shp = slide.shapes.add_shape(shape_type, px_to_emu(node["x"]), px_to_emu(node["y"]),
+                                 px_to_emu(node["w"]), px_to_emu(node["h"]))
+    shp.line.fill.background()  # no border by default
+    shp.shadow.inherit = False
+    return shp
+
+
+def add_box(slide, node):
+    rounded = float(node.get("radius") or 0) >= 6
+    shp = _add_rect(slide, node, rounded=rounded)
+    hexc = rgb_to_hex(node.get("bg"))
+    if hexc:
+        shp.fill.solid()
+        shp.fill.fore_color.rgb = RGBColor.from_string(snap_color(hexc))
+    else:
+        shp.fill.background()
+    return shp
+
+
+def _set_gradient(shp, stops):
+    """Inject a horizontal 2+ stop <a:gradFill> into the shape's spPr via lxml."""
+    spPr = shp._element.spPr
+    for tag in ("a:noFill", "a:solidFill", "a:gradFill", "a:blipFill", "a:pattFill"):
+        existing = spPr.find(qn(tag))
+        if existing is not None:
+            spPr.remove(existing)
+    grad = spPr.makeelement(qn("a:gradFill"), {})
+    lst = grad.makeelement(qn("a:gsLst"), {})
+    n = len(stops)
+    for i, hexc in enumerate(stops):
+        gs = lst.makeelement(qn("a:gs"), {"pos": str(int(i * 100000 / max(n - 1, 1)))})
+        clr = gs.makeelement(qn("a:srgbClr"), {"val": hexc})
+        gs.append(clr); lst.append(gs)
+    grad.append(lst)
+    lin = grad.makeelement(qn("a:lin"), {"ang": "0", "scaled": "1"})
+    grad.append(lin)
+    ln = spPr.find(qn("a:ln"))
+    spPr.insert(list(spPr).index(ln) if ln is not None else len(spPr), grad)
+
+
+def add_rule(slide, node):
+    shp = _add_rect(slide, node, rounded=False)
+    stops = [rgb_to_hex(s) for s in _GRAD_STOP_RE.findall(node.get("grad") or "")]
+    if len(stops) >= 2:
+        _set_gradient(shp, stops)
+    else:
+        shp.fill.solid()
+        shp.fill.fore_color.rgb = RGBColor.from_string(
+            snap_color(rgb_to_hex(node.get("bg")) or PALETTE["blue"]))
+    return shp
