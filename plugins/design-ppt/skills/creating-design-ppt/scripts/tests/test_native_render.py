@@ -112,3 +112,26 @@ def test_add_rule_gradient_has_gradfill(tmp_path):
     shp = nr.add_rule(slide, node)
     ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
     assert shp._element.spPr.find("a:gradFill", ns) is not None
+
+
+def test_add_table_native_with_header_and_total(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    node = {"role": "table", "x": 130, "y": 300, "w": 1660, "h": 400,
+            "rows": [
+                [{"text": "항목", "header": True}, {"text": "금액", "header": True}],
+                [{"text": "매출", "header": False}, {"text": "1,200", "header": False}],
+                [{"text": "합계", "header": False}, {"text": "-50", "header": False}],
+            ]}
+    shp = nr.add_table(slide, node)
+    assert shp.has_table
+    tbl = shp.table
+    assert len(tbl.rows) == 3 and len(tbl.columns) == 2
+    hdr = tbl.cell(0, 0)
+    assert str(hdr.fill.fore_color.rgb) == "0B1B3A"
+    assert str(tbl.cell(2, 0).fill.fore_color.rgb) == "0B3FD1"
+    neg_run = tbl.cell(2, 1).text_frame.paragraphs[0].runs[0]
+    assert str(neg_run.font.color.rgb) == "C0392B"

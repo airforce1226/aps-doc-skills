@@ -243,3 +243,57 @@ def add_rule(slide, node):
         shp.fill.fore_color.rgb = RGBColor.from_string(
             snap_color(rgb_to_hex(node.get("bg")) or PALETTE["blue"]))
     return shp
+
+
+SIZE_BODY_PT = round(14 * PX_TO_PT, 2)  # design body 14px token -> pt
+_NUM_RE = re.compile(r"^-?[\d,]+(\.\d+)?$")
+_CELL_MARGIN = Emu(45720)  # 0.05 in
+
+
+def _cell_text(cell, text, *, color, bold, align):
+    cell.margin_left = cell.margin_right = _CELL_MARGIN
+    tf = cell.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.alignment = align
+    run = p.add_run()
+    run.text = text
+    run.font.name = "맑은 고딕"
+    run.font.size = Pt(SIZE_BODY_PT)
+    run.font.bold = bold
+    run.font.color.rgb = RGBColor.from_string(color)
+
+
+def add_table(slide, node):
+    rows = node["rows"]
+    nrows, ncols = len(rows), max(len(r) for r in rows)
+    gf = slide.shapes.add_table(nrows, ncols, px_to_emu(node["x"]), px_to_emu(node["y"]),
+                                px_to_emu(node["w"]), px_to_emu(node["h"]))
+    tbl = gf.table
+    tbl.first_row = False      # we style cells explicitly; disable built-in banding
+    tbl.horz_banding = False
+    for ri, row in enumerate(rows):
+        is_header = ri == 0 or any(c.get("header") for c in row)
+        first_text = (row[0].get("text") if row else "") or ""
+        is_total = first_text.strip() in ("합계", "계", "소계", "Total")
+        for ci in range(ncols):
+            cell = tbl.cell(ri, ci)
+            data = row[ci] if ci < len(row) else {"text": ""}
+            text = data.get("text", "")
+            numeric = bool(_NUM_RE.match(text.strip()))
+            negative = text.strip().startswith("-")
+            if is_header:
+                bg, fg, bold = PALETTE["navy"], PALETTE["white"], True
+            elif is_total:
+                bg, fg, bold = PALETTE["blue"], PALETTE["white"], True
+            elif ri % 2 == 0:
+                bg, fg, bold = PALETTE["softBlue2"], PALETTE["ink"], False
+            else:
+                bg, fg, bold = PALETTE["white"], PALETTE["ink"], False
+            if negative and not is_header:
+                fg = PALETTE["danger"]
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor.from_string(bg)
+            align = PP_ALIGN.RIGHT if (numeric and not is_header) else PP_ALIGN.LEFT
+            _cell_text(cell, text, color=fg, bold=bold, align=align)
+    return gf
