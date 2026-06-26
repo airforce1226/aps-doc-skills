@@ -68,3 +68,20 @@ def test_dump_dom_builds_expected_command(monkeypatch):
     assert "--dump-dom" in captured["cmd"]
     assert "--headless=new" in captured["cmd"]
     assert "__layout__" in dom
+
+
+def test_add_text_creates_editable_textbox(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    node = {"role": "text", "x": 120, "y": 300, "w": 714, "h": 138,
+            "text": "제목", "font": "Malgun Gothic", "sizePx": 104,
+            "weight": "800", "color": "rgb(255, 255, 255)", "align": "left",
+            "ls": "normal"}
+    shp = nr.add_text(slide, node)
+    assert shp.has_text_frame
+    assert shp.text_frame.paragraphs[0].runs[0].text == "제목"
+    assert shp.text_frame.paragraphs[0].runs[0].font.bold is True
+    assert round(shp.text_frame.paragraphs[0].runs[0].font.size.pt, 2) == 56.16

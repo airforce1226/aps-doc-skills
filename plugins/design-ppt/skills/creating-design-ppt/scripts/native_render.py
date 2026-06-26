@@ -9,7 +9,9 @@ import re
 import subprocess
 from pathlib import Path
 
-from pptx.util import Emu
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.util import Emu, Pt
 
 # Standard 16:9 slide = 13.333" x 7.5". Exact EMU per 작업지시서 §3
 # (12192000 x 6858000), so px_to_emu(1) == 6350 exactly (12192000 / 1920).
@@ -151,3 +153,34 @@ def dump_dom(page_html_path, browser):
         err = result.stderr.decode(errors="replace").strip() if result.stderr else ""
         raise SystemExit("native 모드 dump-dom 실패 (exit %d): %s" % (result.returncode, err))
     return dom
+
+
+_ALIGN = {"left": PP_ALIGN.LEFT, "right": PP_ALIGN.RIGHT,
+          "center": PP_ALIGN.CENTER, "justify": PP_ALIGN.JUSTIFY}
+
+
+def _is_bold(weight):
+    try:
+        return int(weight) >= 600
+    except (TypeError, ValueError):
+        return weight == "bold"
+
+
+def add_text(slide, node):
+    box = slide.shapes.add_textbox(px_to_emu(node["x"]), px_to_emu(node["y"]),
+                                   px_to_emu(node["w"]), px_to_emu(node["h"]))
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.TOP
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = _ALIGN.get(node.get("align"), PP_ALIGN.LEFT)
+    run = p.add_run()
+    run.text = node.get("text", "")
+    run.font.name = node.get("font") or "맑은 고딕"
+    run.font.size = Pt(px_to_pt(node["sizePx"]))
+    run.font.bold = _is_bold(node.get("weight"))
+    hexc = snap_color(rgb_to_hex(node.get("color")))
+    if hexc:
+        run.font.color.rgb = RGBColor.from_string(hexc)
+    return box
