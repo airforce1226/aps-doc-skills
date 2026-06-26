@@ -99,3 +99,13 @@ def test_build_end_to_end(tmp_path):
     assert prs.core_properties.author == "IT전략팀"
     assert prs.slides[0].has_notes_slide
     assert "표지 노트" in prs.slides[0].notes_slide.notes_text_frame.text
+
+
+def test_parse_args_defaults_to_image():
+    deck, out, mode = b.parse_args(["deck.html", "제목 v1.0.pptx"])
+    assert deck == "deck.html" and out == "제목 v1.0.pptx" and mode == "image"
+
+
+def test_parse_args_native_mode():
+    _, _, mode = b.parse_args(["deck.html", "제목 v1.0.pptx", "--mode", "native"])
+    assert mode == "native"

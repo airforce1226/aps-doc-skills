@@ -154,11 +154,37 @@ def build(deck_path, out_path, css=None):
     return out_path
 
 
+def parse_args(argv):
+    mode = "image"
+    rest = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--mode":
+            if i + 1 >= len(argv):
+                raise SystemExit("--mode 뒤에 image 또는 native 값이 필요합니다.")
+            mode = argv[i + 1]
+            i += 2
+            continue
+        rest.append(argv[i])
+        i += 1
+    if len(rest) < 2:
+        raise SystemExit('Usage: python build_design_ppt.py deck.html "제목 v1.0.pptx" [--mode image|native]')
+    if mode not in ("image", "native"):
+        raise SystemExit("--mode 는 image 또는 native 여야 합니다: %s" % mode)
+    return rest[0], rest[1], mode
+
+
 def main():
     if len(sys.argv) < 3:
-        print('Usage: python build_design_ppt.py deck.html "제목 v1.0.pptx"', file=sys.stderr)
+        print('Usage: python build_design_ppt.py deck.html "제목 v1.0.pptx" [--mode image|native]',
+              file=sys.stderr)
         sys.exit(2)
-    out = build(sys.argv[1], sys.argv[2])
+    deck, out, mode = parse_args(sys.argv[1:])
+    if mode == "native":
+        import native_render
+        native_render.build_native(deck, out)
+    else:
+        build(deck, out)
     print("Saved:", out)
 
 
