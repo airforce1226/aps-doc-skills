@@ -49,6 +49,17 @@
 | `sections/13-closing.html` | 마무리 (핵심 메시지 + 다음 단계) |
 | `sections/_classification.html` | 보안 분류 배지 오버레이 (대외비 등, 각 section 맨 앞 자식) |
 
+## 네이티브 모드 색 스냅 · 역할 힌트
+- `--mode native`(편집 가능 출력)는 추출한 색을 위 팔레트의 최근접 토큰으로 **스냅**해
+  임의색 유입을 막는다. `scripts/native_render.py`의 `PALETTE`가 이 표의 코드 사본이므로,
+  토큰을 바꾸면 양쪽을 함께 고친다.
+- 측정기는 각 요소를 휴리스틱으로 분류한다(배경/박스=box, 텍스트 리프=text, 얇은 띠=rule,
+  표=table, img/svg=raster). 한 요소가 배경+텍스트를 동시에 가지면 box와 text를 **둘 다** emit하고,
+  `<section>` 자체 배경은 풀블리드 box가 된다.
+- 네이티브로 재현 불가한 요소(conic-gradient 도넛, 그라데이션 로고 등)는 HTML에
+  `data-ppt="raster"`로 명시하면 그 영역만 이미지로 폴백한다. `data-ppt`는 이미지 모드가
+  무시하므로 안전하다. 값: `box|text|rule|table|raster|skip`.
+
 ## 메타 규칙
 - 각 `<section>`은 `data-label`(식별)·`data-speaker-notes`(발표 노트)를 가진다.
 - 빌드 스크립트가 `data-speaker-notes`를 PowerPoint 발표자 노트로 옮기며, 노트 텍스트에 `noProof="1"`(맞춤법 검사 안 함)을 설정한다.

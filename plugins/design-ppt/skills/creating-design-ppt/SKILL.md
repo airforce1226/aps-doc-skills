@@ -16,6 +16,27 @@ image); the original text is preserved in the **speaker notes**.
 **Core principle:** The HTML/CSS is the source of truth; the `.pptx` is its render.
 Never invent facts — mark unknowns `(미정 — 추후 확정)`.
 
+## Output modes (이미지 vs 네이티브)
+
+The same `deck.html` builds two ways — pick per deliverable:
+
+| 모드 | 명령 | 특성 | 언제 |
+|------|------|------|------|
+| 이미지 (기본) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx"` | 픽셀 100% 충실 · **편집 불가**(슬라이드는 이미지, 원문은 발표자 노트) | 인쇄·배포용 최종본 |
+| 네이티브 | `… "제목 v1.0.pptx" --mode native` | 텍스트·표·도형이 **편집 가능한 PowerPoint 네이티브 개체** · 차트/로고 등 일부 장식은 래스터 폴백 | 받는 사람이 PowerPoint에서 직접 고쳐야 할 때 |
+
+네이티브 모드는 같은 `deck.html`을 헤드리스 Chrome `--dump-dom`으로 **측정**해 각 요소의
+좌표·스타일을 읽고 python-pptx 네이티브 개체로 재배치한다(`scripts/native_render.py`).
+빌드 끝에 슬라이드별 `native=/raster=` 리포트를 출력해 편집 가능성과 폴백 위치를 보여준다.
+색은 `assets/design-tokens.md` 팔레트로 스냅되고, 폰트는 맑은 고딕, 팀 규칙(author=IT전략팀·
+대외비 배지·noProof 노트)은 두 모드 공통이다.
+
+**언제 무엇이 래스터로 떨어지나:** `conic-gradient` 도넛 차트, 그라데이션 로고(SVG) 등
+네이티브로 재현 불가한 장식만 그 영역의 이미지로 폴백한다(작업지시서 §5.7 철학). 그 외
+배경·박스·룰·표·KPI 숫자·막대 차트는 모두 편집 가능한 네이티브 개체로 생성된다.
+재현 불가 요소를 새로 추가할 때는 해당 HTML에 `data-ppt="raster"`를 붙이면 명시적으로
+래스터 처리된다(예: `assets/sections/09-charts.html`의 도넛).
+
 ## When to Use
 
 - "이 디자인으로 PPT 만들어줘", "APS 브랜드 슬라이드 / APS 템플릿 보고서를 .pptx로"
@@ -65,7 +86,9 @@ Never invent facts — mark unknowns `(미정 — 추후 확정)`.
 |------|----|
 | Slide archetypes | `assets/sections/*.html` |
 | Design tokens | `assets/design-tokens.md` |
-| Build deck | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx"` |
+| Build deck (image, 기본) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx"` |
+| Build deck (native, 편집 가능) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` |
+| 재현 불가 요소를 래스터로 | 해당 HTML 요소에 `data-ppt="raster"` 부여 |
 | Mark unknown | put `(미정 — 추후 확정)` in the text |
 | 보안 분류 배지 | `assets/sections/_classification.html` 를 각 section 맨 앞에 |
 | Browser not found | set `DESIGN_PPT_BROWSER` to chrome.exe/msedge.exe |
@@ -76,5 +99,7 @@ Never invent facts — mark unknowns `(미정 — 추후 확정)`.
 - Underscores in the filename or a missing `v1.0` suffix.
 - A person's name as author instead of IT전략팀.
 - 대외비/기밀 등 보안 분류 배지를 일부 슬라이드에서만 넣고 누락(전 슬라이드 일관 배치).
-- Expecting editable text in PowerPoint — slides are images by design; edit the
-  HTML and rebuild instead.
+- Expecting editable text in PowerPoint — in **이미지 모드** slides are images by design;
+  edit the HTML and rebuild, or use `--mode native` for editable native objects.
+- 네이티브 모드 결과에서 차트/로고가 이미지인 것을 버그로 오인 — 의도된 래스터 폴백이다
+  (편집 대상은 텍스트·표·도형·배경). 막대 차트는 네이티브, 도넛만 래스터.
