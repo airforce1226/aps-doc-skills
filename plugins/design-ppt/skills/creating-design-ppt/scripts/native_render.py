@@ -304,15 +304,15 @@ def add_table(slide, node):
 
 
 def crop_node_png(section_png, node, out_path):
-    img = Image.open(section_png)
     x, y = int(round(node["x"])), int(round(node["y"]))
     w, h = int(round(node["w"])), int(round(node["h"]))
-    img.crop((x, y, x + w, y + h)).save(out_path)
+    with Image.open(section_png) as img:
+        img.crop((x, y, x + w, y + h)).save(out_path)
     return out_path
 
 
 def add_raster(slide, node, section_png, tmp_dir, idx):
-    out = "%s/raster_%d.png" % (tmp_dir, idx)
+    out = str(Path(tmp_dir) / ("raster_%d.png" % idx))
     crop_node_png(section_png, node, out)
     return slide.shapes.add_picture(out, px_to_emu(node["x"]), px_to_emu(node["y"]),
                                     px_to_emu(node["w"]), px_to_emu(node["h"]))
