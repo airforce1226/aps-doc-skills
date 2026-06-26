@@ -44,9 +44,11 @@ def px_to_emu(px):
 
 
 def rgb_to_hex(css):
-    m = re.search(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)", css or "")
+    m = re.search(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)", css or "")
     if not m:
         return None
+    if m.group(4) is not None and float(m.group(4)) == 0:
+        return None  # fully transparent -> no fill
     return "".join("%02X" % int(m.group(i)) for i in (1, 2, 3))
 
 
@@ -66,6 +68,9 @@ def snap_color(hex6, tol=12):
 
 
 # Injected before </body>. Walks the DOM, classifies each node, emits layout JSON.
+# An element may emit BOTH a box (its fill) AND a text node (its text) — that is how
+# filled-and-labelled elements (badges, KPI cards, the navy decision box) keep both
+# their background and their text. The <section>'s own background becomes a full-bleed box.
 MEASURE_JS = r"""
 <script>
 (function(){
@@ -77,48 +82,61 @@ MEASURE_JS = r"""
     }
     return false;
   }
-  function role(el, cs){
-    var hint=el.getAttribute('data-ppt'); if(hint) return hint;
-    var tag=el.tagName.toLowerCase();
-    if(tag==='table') return 'table';
-    if(tag==='img'||tag==='svg'||tag==='canvas') return 'raster';
-    var r=el.getBoundingClientRect();
-    var grad=(cs.backgroundImage||'').indexOf('gradient')>=0;
-    if((r.height<=6 || r.width<=6) && (grad || cs.backgroundColor!=='rgba(0, 0, 0, 0)')) return 'rule';
-    var txt=(el.textContent||'').trim();
-    if(txt && !hasElementChildren(el)) return 'text';
-    if(cs.backgroundColor!=='rgba(0, 0, 0, 0)' || cs.borderTopWidth!=='0px'
-       || (cs.borderRadius && cs.borderRadius!=='0px')) return 'box';
-    return 'skip';
+  function opaque(c){ return !!c && c!=='transparent' && c.indexOf('rgba(0, 0, 0, 0)')<0; }
+  function baseNode(role, el, cs, r){
+    return {role:role, x:r.left, y:r.top, w:r.width, h:r.height,
+      color:cs.color, bg:cs.backgroundColor, grad:cs.backgroundImage,
+      align:cs.textAlign, font:firstFont(cs.fontFamily), sizePx:parseFloat(cs.fontSize),
+      weight:cs.fontWeight, ls:cs.letterSpacing, radius:parseFloat(cs.borderTopLeftRadius)||0};
   }
-  var out=[], all=document.querySelectorAll('section *');
+  function tableNode(el, cs, r){
+    var node=baseNode('table', el, cs, r), rows=[];
+    el.querySelectorAll('tr').forEach(function(tr){
+      var cells=[];
+      tr.querySelectorAll('th,td').forEach(function(td){
+        var tcs=getComputedStyle(td);
+        cells.push({text:(td.textContent||'').trim(), bg:tcs.backgroundColor,
+          color:tcs.color, weight:tcs.fontWeight, align:tcs.textAlign,
+          header:td.tagName.toLowerCase()==='th'});
+      });
+      rows.push(cells);
+    });
+    node.rows=rows; return node;
+  }
+  function textNode(el, cs, r){ var n=baseNode('text', el, cs, r); n.text=(el.textContent||'').trim(); return n; }
+  var out=[];
+  var sec=document.querySelector('section');
+  if(sec){
+    var scs=getComputedStyle(sec), sr=sec.getBoundingClientRect();
+    if(opaque(scs.backgroundColor)) out.push(baseNode('box', sec, scs, sr));
+  }
+  var all=document.querySelectorAll('section *');
   for(var i=0;i<all.length;i++){
     var el=all[i], cs=getComputedStyle(el);
     if(cs.display==='none'||cs.visibility==='hidden') continue;
-    var ro=role(el,cs); if(ro==='skip') continue;
     var r=el.getBoundingClientRect();
     if(r.width<=0||r.height<=0) continue;
-    var node={role:ro, x:r.left, y:r.top, w:r.width, h:r.height,
-      color:cs.color, bg:cs.backgroundColor, grad:cs.backgroundImage,
-      align:cs.textAlign, font:firstFont(cs.fontFamily), sizePx:parseFloat(cs.fontSize),
-      weight:cs.fontWeight, ls:cs.letterSpacing,
-      radius:parseFloat(cs.borderTopLeftRadius)||0};
-    if(ro==='text'){ node.text=(el.textContent||'').trim(); }
-    if(ro==='table'){
-      var rows=[];
-      el.querySelectorAll('tr').forEach(function(tr){
-        var cells=[];
-        tr.querySelectorAll('th,td').forEach(function(td){
-          var tcs=getComputedStyle(td);
-          cells.push({text:(td.textContent||'').trim(), bg:tcs.backgroundColor,
-            color:tcs.color, weight:tcs.fontWeight, align:tcs.textAlign,
-            header:td.tagName.toLowerCase()==='th'});
-        });
-        rows.push(cells);
-      });
-      node.rows=rows;
+    var tag=el.tagName.toLowerCase();
+    var txt=(el.textContent||'').trim();
+    var isLeaf = !!txt && !hasElementChildren(el);
+    var grad=(cs.backgroundImage||'').indexOf('gradient')>=0;
+    var thin = r.height<=6 || r.width<=6;
+    var filled = opaque(cs.backgroundColor);
+    var bordered = cs.borderTopWidth!=='0px' && cs.borderTopWidth!=='0';
+    var hint=el.getAttribute('data-ppt');
+    if(hint){
+      if(hint==='skip') continue;
+      if(hint==='table'){ out.push(tableNode(el,cs,r)); continue; }
+      if(hint==='text'){ out.push(textNode(el,cs,r)); continue; }
+      if(hint==='rule'||hint==='raster'){ out.push(baseNode(hint,el,cs,r)); continue; }
+      if(hint==='box'){ out.push(baseNode('box',el,cs,r)); if(isLeaf) out.push(textNode(el,cs,r)); continue; }
+      // unknown hint -> fall through to heuristics
     }
-    out.push(node);
+    if(tag==='table'){ out.push(tableNode(el,cs,r)); continue; }
+    if(tag==='img'||tag==='svg'||tag==='canvas'){ out.push(baseNode('raster',el,cs,r)); continue; }
+    if(thin && (grad||filled)){ out.push(baseNode('rule',el,cs,r)); continue; }
+    if(filled||bordered) out.push(baseNode('box',el,cs,r));   // box AND ...
+    if(isLeaf) out.push(textNode(el,cs,r));                    // ... text, if both
   }
   var pre=document.createElement('pre'); pre.id='__layout__';
   pre.textContent=JSON.stringify(out); document.body.appendChild(pre);

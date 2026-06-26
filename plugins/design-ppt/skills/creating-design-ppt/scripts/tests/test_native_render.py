@@ -198,3 +198,16 @@ def test_build_native_end_to_end(tmp_path):
     assert any(s.has_text_frame and "제목" in s.text_frame.text for s in shapes)
     # No full-bleed picture: native mode must not bake a screenshot.
     assert not any(s.shape_type == 13 for s in shapes)  # 13 = PICTURE
+    # The <section>'s own navy background must become a full-bleed native box.
+    def _is_full_bleed(s):
+        return (s.left <= 2000 and s.top <= 2000
+                and s.width >= prs.slide_width - 8000
+                and s.height >= prs.slide_height - 8000)
+
+    def _navy_fill(s):
+        try:
+            return str(s.fill.fore_color.rgb) == "0B1B3A"
+        except Exception:
+            return False
+
+    assert any(_is_full_bleed(s) and _navy_fill(s) for s in shapes)
