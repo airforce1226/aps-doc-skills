@@ -137,6 +137,16 @@ def test_add_table_native_with_header_and_total(tmp_path):
     assert str(neg_run.font.color.rgb) == "C0392B"
 
 
+def test_add_table_empty_rows_returns_none(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    node = {"role": "table", "x": 130, "y": 300, "w": 1660, "h": 400, "rows": []}
+    assert nr.add_table(slide, node) is None  # no crash on empty rows
+
+
 def test_crop_node_png(tmp_path):
     from PIL import Image
     src = tmp_path / "section.png"

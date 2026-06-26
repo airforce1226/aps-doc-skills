@@ -288,6 +288,8 @@ def _cell_text(cell, text, *, color, bold, align):
 
 def add_table(slide, node):
     rows = node["rows"]
+    if not rows or not any(rows):
+        return None  # a <table>/hint with no rows -> nothing to render
     nrows, ncols = len(rows), max(len(r) for r in rows)
     gf = slide.shapes.add_table(nrows, ncols, px_to_emu(node["x"]), px_to_emu(node["y"]),
                                 px_to_emu(node["w"]), px_to_emu(node["h"]))
