@@ -49,3 +49,22 @@ def test_extract_layout_missing_pre_raises():
 
 def test_measure_js_is_nonempty_string():
     assert isinstance(nr.MEASURE_JS, str) and "__layout__" in nr.MEASURE_JS
+
+
+def test_dump_dom_builds_expected_command(monkeypatch):
+    captured = {}
+
+    class FakeResult:
+        returncode = 0
+        stdout = b"<html><pre id=\"__layout__\">[]</pre></html>"
+        stderr = b""
+
+    def fake_run(cmd, **kw):
+        captured["cmd"] = cmd
+        return FakeResult()
+
+    monkeypatch.setattr(nr.subprocess, "run", fake_run)
+    dom = nr.dump_dom("C:/tmp/page.html", "chrome.exe")
+    assert "--dump-dom" in captured["cmd"]
+    assert "--headless=new" in captured["cmd"]
+    assert "__layout__" in dom

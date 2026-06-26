@@ -6,6 +6,8 @@ and emits editable python-pptx shapes instead of a baked screenshot.
 """
 import json
 import re
+import subprocess
+from pathlib import Path
 
 from pptx.util import Emu
 
@@ -127,3 +129,25 @@ def extract_layout(dom_text):
     # dump-dom HTML-escapes &, <, > inside <pre>; undo before JSON parse.
     raw = raw.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     return json.loads(raw)
+
+
+W, H = 1920, 1080
+
+
+def dump_dom(page_html_path, browser):
+    url = Path(page_html_path).resolve().as_uri()
+    cmd = [
+        browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+        "--force-device-scale-factor=1",
+        "--run-all-compositor-stages-before-draw",
+        "--virtual-time-budget=3000",
+        "--window-size=%d,%d" % (W, H),
+        "--dump-dom", url,
+    ]
+    result = subprocess.run(cmd, check=False, timeout=120,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    dom = result.stdout.decode("utf-8", errors="replace") if result.stdout else ""
+    if result.returncode != 0 or "__layout__" not in dom:
+        err = result.stderr.decode(errors="replace").strip() if result.stderr else ""
+        raise SystemExit("native 모드 dump-dom 실패 (exit %d): %s" % (result.returncode, err))
+    return dom
