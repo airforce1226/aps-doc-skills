@@ -1,17 +1,19 @@
 ---
 name: creating-design-ppt
-description: Use when asked to create an APS-Brand-Presentation-style Korean slide report as a .pptx — assemble a deck.html from the APS section archetypes, then render each 1920×1080 <section> to a pixel-faithful slide. Applies the IT전략팀 team rules.
+description: Use when asked to create an APS-Brand-Presentation-style Korean slide report as a .pptx — assemble a deck.html from the APS section archetypes, then build each 1920×1080 <section> as editable PowerPoint native objects (default), or as a pixel-faithful image with --mode image. Applies the IT전략팀 team rules.
 ---
 
-# Creating Design PPT (HTML deck → pixel-faithful .pptx)
+# Creating Design PPT (HTML deck → editable native .pptx)
 
 ## Overview
 
 Produce a Korean PowerPoint report that preserves the **APS Brand Presentation
-System** visual identity exactly, by assembling an HTML deck from the 14 APS
-section archetypes (`assets/sections/`) and rendering each `<section>` (1920×1080)
-to a full-bleed slide image. Slide text is not editable in PowerPoint (it is an
-image); the original text is preserved in the **speaker notes**.
+System** visual identity, by assembling an HTML deck from the 14 APS section
+archetypes (`assets/sections/`) and building each `<section>` (1920×1080) into a
+slide. **The default output is editable native PowerPoint objects** (textboxes,
+tables, shapes) so the recipient can edit text/colors/tables directly; an
+optional **image mode** (`--mode image`) bakes pixel-faithful screenshots instead
+(text not editable; original text preserved in the speaker notes).
 
 **Core principle:** The HTML/CSS is the source of truth; the `.pptx` is its render.
 Never invent facts — mark unknowns `(미정 — 추후 확정)`.
@@ -22,8 +24,8 @@ The same `deck.html` builds two ways — pick per deliverable:
 
 | 모드 | 명령 | 특성 | 언제 |
 |------|------|------|------|
-| 이미지 (기본) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx"` | 픽셀 100% 충실 · **편집 불가**(슬라이드는 이미지, 원문은 발표자 노트) | 인쇄·배포용 최종본 |
-| 네이티브 | `… "제목 v1.0.pptx" --mode native` | 텍스트·표·도형이 **편집 가능한 PowerPoint 네이티브 개체** · 차트/로고 등 일부 장식은 래스터 폴백 | 받는 사람이 PowerPoint에서 직접 고쳐야 할 때 |
+| 네이티브 (**기본** — `/design-ppt`가 사용) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` | 텍스트·표·도형이 **편집 가능한 PowerPoint 네이티브 개체** · 차트/로고 등 일부 장식은 래스터 폴백 | 받는 사람이 PowerPoint에서 직접 고쳐야 할 때 (대부분) |
+| 이미지 (opt-in) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` | 픽셀 100% 충실 · **편집 불가**(슬라이드는 이미지, 원문은 발표자 노트) | 인쇄·배포용 픽셀 완벽 최종본 |
 
 네이티브 모드는 같은 `deck.html`을 헤드리스 Chrome `--dump-dom`으로 **측정**해 각 요소의
 좌표·스타일을 읽고 python-pptx 네이티브 개체로 재배치한다(`scripts/native_render.py`).
@@ -40,8 +42,10 @@ The same `deck.html` builds two ways — pick per deliverable:
 ## When to Use
 
 - "이 디자인으로 PPT 만들어줘", "APS 브랜드 슬라이드 / APS 템플릿 보고서를 .pptx로"
-- A pixel-faithful designed deck is the deliverable (NOT an editable native deck →
-  use `creating-ppt-reports` for that).
+- The APS-brand **designed** deck is the deliverable, laid out via the HTML archetypes.
+  Default output is editable native objects; add `--mode image` only when pixel-perfect
+  screenshots are required. (For a structure-first native deck authored without the HTML
+  design layer, `creating-ppt-reports` is the alternative.)
 
 ## Workflow
 
@@ -57,10 +61,14 @@ The same `deck.html` builds two ways — pick per deliverable:
    `#BED600→#2BA6CB` / Malgun Gothic). 14개 아키타입이 `assets/sections/`에 있다.
    보안 분류가 있으면 `assets/sections/_classification.html` 배지를 **모든** `<section>`의
    맨 앞 자식으로 붙이고 등급 텍스트만 교체한다(부모 section 에 `position:relative` 필요).
-3. **Build** — `python scripts/build_design_ppt.py deck.html "<제목> v1.0.pptx"`
-4. **Verify** — reopen with python-pptx; confirm slide count, notes present, and
-   `core_properties.author == "IT전략팀"`. 보안 분류 대상이면 **모든** 슬라이드에 배지가
-   있는지 확인한다(노트 텍스트는 빌드 시 맞춤법 검사 비활성 `noProof` 자동 처리됨).
+3. **Build (기본: 편집 가능 네이티브)** —
+   `python scripts/build_design_ppt.py deck.html "<제목> v1.0.pptx" --mode native`
+   빌드 끝의 `native=/raster=` 리포트로 편집 가능성·폴백 위치를 확인한다.
+   픽셀 완벽 이미지본이 필요하면 `--mode image`로 빌드한다(또는 두 개 다 산출).
+4. **Verify** — reopen with python-pptx; confirm slide count and
+   `core_properties.author == "IT전략팀"`. 네이티브 모드면 텍스트/표/도형이 **picture가 아닌
+   실제 개체**인지(예: `shape.has_text_frame` / `has_table`) 확인한다. 보안 분류 대상이면
+   **모든** 슬라이드에 배지가 있는지 확인한다(노트 텍스트는 빌드 시 `noProof` 자동 처리됨).
 5. **Report done** — give the file path and slide count.
 
 ## Team Rules (enforced — do not deviate)
@@ -86,8 +94,8 @@ The same `deck.html` builds two ways — pick per deliverable:
 |------|----|
 | Slide archetypes | `assets/sections/*.html` |
 | Design tokens | `assets/design-tokens.md` |
-| Build deck (image, 기본) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx"` |
-| Build deck (native, 편집 가능) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` |
+| Build deck (native, **기본·편집 가능**) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` |
+| Build deck (image, 픽셀 완벽·편집 불가) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` |
 | 재현 불가 요소를 래스터로 | 해당 HTML 요소에 `data-ppt="raster"` 부여 |
 | Mark unknown | put `(미정 — 추후 확정)` in the text |
 | 보안 분류 배지 | `assets/sections/_classification.html` 를 각 section 맨 앞에 |
@@ -99,7 +107,7 @@ The same `deck.html` builds two ways — pick per deliverable:
 - Underscores in the filename or a missing `v1.0` suffix.
 - A person's name as author instead of IT전략팀.
 - 대외비/기밀 등 보안 분류 배지를 일부 슬라이드에서만 넣고 누락(전 슬라이드 일관 배치).
-- Expecting editable text in PowerPoint — in **이미지 모드** slides are images by design;
-  edit the HTML and rebuild, or use `--mode native` for editable native objects.
+- `--mode image`로 빌드해 놓고 PowerPoint에서 텍스트가 안 고쳐진다고 하기 — 이미지 모드는
+  의도적으로 편집 불가다(기본 네이티브 모드를 쓰거나 HTML을 고쳐 재빌드).
 - 네이티브 모드 결과에서 차트/로고가 이미지인 것을 버그로 오인 — 의도된 래스터 폴백이다
   (편집 대상은 텍스트·표·도형·배경). 막대 차트는 네이티브, 도넛만 래스터.

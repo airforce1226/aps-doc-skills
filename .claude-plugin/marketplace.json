@@ -21,7 +21,7 @@
     },
     {
       "name": "design-ppt",
-      "description": "Render an APS-Brand-Presentation-System HTML deck into a pixel-faithful Korean .pptx — each <section> becomes one 1920×1080 slide via headless-Chrome render + full-bleed assembly. 14 APS slide archetypes. Enforces IT전략팀 team rules.",
+      "description": "Build an APS-Brand-Presentation-System HTML deck into a Korean .pptx — each <section> (1920×1080) becomes a slide of editable PowerPoint native objects by default (textboxes/tables/shapes), or a pixel-faithful image with --mode image. 14 APS archetypes. Enforces IT전략팀 team rules.",
       "source": "./plugins/design-ppt",
       "category": "productivity"
     }
