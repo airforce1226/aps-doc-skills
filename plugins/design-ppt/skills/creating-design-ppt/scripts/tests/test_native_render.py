@@ -135,3 +135,13 @@ def test_add_table_native_with_header_and_total(tmp_path):
     assert str(tbl.cell(2, 0).fill.fore_color.rgb) == "0B3FD1"
     neg_run = tbl.cell(2, 1).text_frame.paragraphs[0].runs[0]
     assert str(neg_run.font.color.rgb) == "C0392B"
+
+
+def test_crop_node_png(tmp_path):
+    from PIL import Image
+    src = tmp_path / "section.png"
+    Image.new("RGB", (1920, 1080), (255, 0, 0)).save(src)
+    node = {"x": 100, "y": 50, "w": 200, "h": 80}
+    out = nr.crop_node_png(str(src), node, str(tmp_path / "crop.png"))
+    img = Image.open(out)
+    assert img.size == (200, 80)

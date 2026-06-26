@@ -9,6 +9,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from PIL import Image
+
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
@@ -297,3 +299,18 @@ def add_table(slide, node):
             align = PP_ALIGN.RIGHT if (numeric and not is_header) else PP_ALIGN.LEFT
             _cell_text(cell, text, color=fg, bold=bold, align=align)
     return gf
+
+
+def crop_node_png(section_png, node, out_path):
+    img = Image.open(section_png)
+    x, y = int(round(node["x"])), int(round(node["y"]))
+    w, h = int(round(node["w"])), int(round(node["h"]))
+    img.crop((x, y, x + w, y + h)).save(out_path)
+    return out_path
+
+
+def add_raster(slide, node, section_png, tmp_dir, idx):
+    out = "%s/raster_%d.png" % (tmp_dir, idx)
+    crop_node_png(section_png, node, out)
+    return slide.shapes.add_picture(out, px_to_emu(node["x"]), px_to_emu(node["y"]),
+                                    px_to_emu(node["w"]), px_to_emu(node["h"]))
