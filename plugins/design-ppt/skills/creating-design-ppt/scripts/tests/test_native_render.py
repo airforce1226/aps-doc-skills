@@ -145,3 +145,21 @@ def test_crop_node_png(tmp_path):
     out = nr.crop_node_png(str(src), node, str(tmp_path / "crop.png"))
     img = Image.open(out)
     assert img.size == (200, 80)
+
+
+def test_render_slide_dispatches_and_counts(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Cm
+    prs = Presentation()
+    prs.slide_width = Cm(33.867); prs.slide_height = Cm(19.05)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    nodes = [
+        {"role": "box", "x": 0, "y": 0, "w": 1920, "h": 1080,
+         "bg": "rgb(11, 27, 58)", "grad": "none", "radius": 0},
+        {"role": "text", "x": 120, "y": 300, "w": 700, "h": 138, "text": "제목",
+         "font": "Malgun Gothic", "sizePx": 104, "weight": "800",
+         "color": "rgb(255,255,255)", "align": "left", "ls": "normal"},
+    ]
+    counts = nr.render_slide(slide, nodes, section_png=None, tmp_dir=str(tmp_path), si=0)
+    assert counts["native"] == 2 and counts["raster"] == 0
+    assert any(s.has_text_frame for s in slide.shapes)

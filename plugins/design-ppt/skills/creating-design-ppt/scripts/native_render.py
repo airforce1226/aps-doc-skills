@@ -5,8 +5,10 @@ Reads a deck.html section's computed layout (via headless Chrome --dump-dom)
 and emits editable python-pptx shapes instead of a baked screenshot.
 """
 import json
+import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 
 from PIL import Image
@@ -314,3 +316,73 @@ def add_raster(slide, node, section_png, tmp_dir, idx):
     crop_node_png(section_png, node, out)
     return slide.shapes.add_picture(out, px_to_emu(node["x"]), px_to_emu(node["y"]),
                                     px_to_emu(node["w"]), px_to_emu(node["h"]))
+
+
+def render_slide(slide, nodes, section_png, tmp_dir, si):
+    counts = {"native": 0, "raster": 0}
+    # Boxes/rules first (background layer), then raster, then tables/text on top.
+    order = {"box": 0, "rule": 1, "raster": 2, "table": 3, "text": 4}
+    for node in sorted(nodes, key=lambda n: order.get(n["role"], 5)):
+        role = node["role"]
+        if role == "box":
+            add_box(slide, node); counts["native"] += 1
+        elif role == "rule":
+            add_rule(slide, node); counts["native"] += 1
+        elif role == "text":
+            add_text(slide, node); counts["native"] += 1
+        elif role == "table":
+            add_table(slide, node); counts["native"] += 1
+        elif role == "raster":
+            if section_png:
+                add_raster(slide, node, section_png, tmp_dir, len(slide.shapes))
+                counts["raster"] += 1
+    return counts
+
+
+def build_native(deck_path, out_path, css=None, browser=None):
+    import build_design_ppt as b
+    from pptx import Presentation
+    html = Path(deck_path).read_text(encoding="utf-8")
+    if css is None:
+        css_file = b.ASSETS / "base.css"
+        css = css_file.read_text(encoding="utf-8") if css_file.exists() else ""
+    sections = b.split_sections(html)
+    if not sections:
+        raise SystemExit("deck.html에서 <section>을 찾지 못했습니다.")
+    browser = browser or b.find_browser()
+    prs = Presentation()
+    prs.slide_width = b.SLIDE_W
+    prs.slide_height = b.SLIDE_H
+    blank = prs.slide_layouts[6]
+    report = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for si, sec in enumerate(sections):
+            page = os.path.join(tmp, "slide_%02d.html" % si)
+            wrapped = b.wrap_section_page(sec["html"], css).replace(
+                "</body>", MEASURE_JS + "</body>")
+            Path(page).write_text(wrapped, encoding="utf-8")
+            nodes = extract_layout(dump_dom(page, browser))
+            section_png = None
+            if any(n["role"] == "raster" for n in nodes):
+                section_png = os.path.join(tmp, "slide_%02d.png" % si)
+                b.capture_slide(page, section_png, browser)
+            slide = prs.slides.add_slide(blank)
+            counts = render_slide(slide, nodes, section_png, tmp, si)
+            if sec.get("notes"):
+                b._set_notes(slide, sec["notes"])
+            report.append((si, sec.get("label", ""), counts))
+        prs.core_properties.author = b.AUTHOR
+        prs.core_properties.last_modified_by = b.AUTHOR
+        prs.save(out_path)
+    print_report(report)
+    return out_path
+
+
+def print_report(report):
+    tot_n = sum(c["native"] for _, _, c in report)
+    tot_r = sum(c["raster"] for _, _, c in report)
+    for si, label, c in report:
+        print("Slide %02d (%s): native=%d raster=%d"
+              % (si + 1, label or "-", c["native"], c["raster"]))
+    print("Total: %d slides, %d native objects, %d raster fallbacks."
+          % (len(report), tot_n, tot_r))
