@@ -8,9 +8,10 @@ import re
 
 from pptx.util import Emu
 
-# Slide is 13.333" x 7.5" (16:9). 1 inch = 914400 EMU.
-SLIDE_W_EMU = int(13.333 * 914400)
-SLIDE_H_EMU = int(7.5 * 914400)
+# Standard 16:9 slide = 13.333" x 7.5". Exact EMU per 작업지시서 §3
+# (12192000 x 6858000), so px_to_emu(1) == 6350 exactly (12192000 / 1920).
+SLIDE_W_EMU = 12192000
+SLIDE_H_EMU = 6858000
 PX_TO_PT = 0.54  # design canvas px -> slide pt
 
 # Single source of truth for color snapping — mirrors assets/design-tokens.md.
