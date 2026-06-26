@@ -21,7 +21,7 @@
     },
     {
       "name": "design-ppt",
-      "description": "Render a Claude-Design-style HTML deck into a pixel-faithful Korean .pptx — each <section> becomes one 1920×1080 slide via headless-Chrome render + full-bleed assembly. Enforces IT전략팀 team rules.",
+      "description": "Render an APS-Brand-Presentation-System HTML deck into a pixel-faithful Korean .pptx — each <section> becomes one 1920×1080 slide via headless-Chrome render + full-bleed assembly. 14 APS slide archetypes. Enforces IT전략팀 team rules.",
       "source": "./plugins/design-ppt",
       "category": "productivity"
     }
