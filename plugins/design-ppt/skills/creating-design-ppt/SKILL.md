@@ -51,24 +51,26 @@ The same `deck.html` builds two ways — pick per deliverable:
 
 1. **Gather content** — report type + reader (임원/실무); interview or read a draft.
    Never invent unknowns → `(미정 — 추후 확정)`.
-   **보안 분류 확인 (필수):** 문서가 대외비/기밀/대내한/내부용에 해당하는지 반드시 확인·결정한다.
-   해당하면 모든 슬라이드에 분류 배지를 넣고, 비해당이면 "공개 — 배지 생략"으로 명시한다. 그냥 넘어가지 않는다.
+   **보안 분류 = 기본 "대외비" (묻지 않는다):** APS 사내 보고서는 모두 대외비이므로 별도로 묻지 말고
+   **모든 슬라이드에 "대외비" 배지를 기본 적용**한다. 사용자가 **명시적으로** 다른 등급(기밀/대내한/내부용)
+   이나 "공개(배지 없음)"를 요청한 경우에만 그에 맞춰 변경한다.
 2. **Assemble `deck.html`** — copy snippets from `assets/sections/` into one file,
    in order. Replace every `[[...]]` placeholder with real content and write each
    `data-speaker-notes`. Follow `assets/design-tokens.md`; the shared `assets/base.css`
    is injected automatically at build time. New layouts must reuse the tokens
    (Navy `#0b1b3a` / Paper `#f5f7fa` / APS Blue `#0b3fd1` / Brand Gradient
    `#BED600→#2BA6CB` / Malgun Gothic). 14개 아키타입이 `assets/sections/`에 있다.
-   보안 분류가 있으면 `assets/sections/_classification.html` 배지를 **모든** `<section>`의
-   맨 앞 자식으로 붙이고 등급 텍스트만 교체한다(부모 section 에 `position:relative` 필요).
+   `assets/sections/_classification.html` 배지("대외비")를 **모든** `<section>`의 맨 앞 자식으로
+   기본 배치한다(부모 section 에 `position:relative` 필요). 다른 등급을 명시받은 경우에만 텍스트를 교체한다.
 3. **Build (기본: 편집 가능 네이티브)** —
    `python scripts/build_design_ppt.py deck.html "<제목> v1.0.pptx" --mode native`
    빌드 끝의 `native=/raster=` 리포트로 편집 가능성·폴백 위치를 확인한다.
    픽셀 완벽 이미지본이 필요하면 `--mode image`로 빌드한다(또는 두 개 다 산출).
 4. **Verify** — reopen with python-pptx; confirm slide count and
    `core_properties.author == "IT전략팀"`. 네이티브 모드면 텍스트/표/도형이 **picture가 아닌
-   실제 개체**인지(예: `shape.has_text_frame` / `has_table`) 확인한다. 보안 분류 대상이면
-   **모든** 슬라이드에 배지가 있는지 확인한다(슬라이드 본문·표의 모든 텍스트 run + 노트가 빌드 시 `noProof` 자동 처리됨).
+   실제 개체**인지(예: `shape.has_text_frame` / `has_table`) 확인한다. 기본적으로
+   **모든** 슬라이드에 "대외비" 배지가 있는지 확인한다(사용자가 공개를 명시한 경우만 예외).
+   (슬라이드 본문·표의 모든 텍스트 run + 노트가 빌드 시 `noProof` 자동 처리됨).
 5. **Report done** — give the file path and slide count.
 
 ## Team Rules (enforced — do not deviate)
@@ -79,7 +81,7 @@ The same `deck.html` builds two ways — pick per deliverable:
 | Filename: spaces, **no underscores**, version suffix last | e.g. `착수 보고서 v1.0.pptx`. Pass this exact path to the script. |
 | Don't invent unknowns | Use `(미정 — 추후 확정)` in the slide text. |
 | **개조식 작성 (구어체 금지)** | 슬라이드 본문은 **명사형 종결**의 개조식으로 쓴다. `~있었습니다/~합니다/~됩니다` 같은 구어체(합쇼체) 종결어미 금지 → `~잔존/~점유/~정상화` 처럼 명사형으로 맺는다. |
-| **보안 분류 누락 금지** | 대외비/기밀 등 해당 시 `_classification.html` 배지를 전 슬라이드에 배치. 비해당이면 의도적 생략을 명시. |
+| **보안 분류 = 기본 대외비 (묻지 않음)** | `_classification.html`("대외비") 배지를 **전 슬라이드에 기본 배치**. 사용자가 다른 등급/공개를 명시할 때만 변경. |
 | 보안 배지 = 빨강 **테두리만·정중앙** | `_classification.html` 배지는 채움 없이 적색 테두리(2px)·적색 글자, 텍스트는 박스 정중앙. 네이티브 빌드 시 `native_render.py`가 테두리 박스 + 중앙 정렬 텍스트로 생성한다(채움 X). |
 | 맞춤법 검사 비활성(noProof) | `native_render.py`(슬라이드 본문·표 **모든** 텍스트 run)와 `build_design_ppt.py`(발표자 노트)가 `lang="ko-KR"` + `noProof="1"` 설정 (검토>언어>교정 언어 설정>맞춤법 검사 안 함). |
 

@@ -20,3 +20,4 @@ User request / arguments: $ARGUMENTS
 
 Guidance:
 - If a report title/type is given, use it; otherwise ask. If a `deck.html` path is given, base the build on it.
+- **보안 등급은 묻지 않는다.** APS 사내 보고서는 모두 **대외비**이므로 기본으로 전 슬라이드에 "대외비" 배지를 적용한다. 사용자가 명시적으로 다른 등급/공개를 요청할 때만 변경한다.
