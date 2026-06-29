@@ -465,11 +465,13 @@ def build_native(deck_path, out_path, css=None, browser=None):
     prs.slide_width = b.SLIDE_W
     prs.slide_height = b.SLIDE_H
     blank = prs.slide_layouts[6]
+    labels = b.assign_page_numbers(sections)
     report = []
     with tempfile.TemporaryDirectory() as tmp:
         for si, sec in enumerate(sections):
             page = os.path.join(tmp, "slide_%02d.html" % si)
-            wrapped = b.wrap_section_page(sec["html"], css).replace(
+            sec_html = b.inject_page_number(sec["html"], sec.get("attrs", ""), labels[si])
+            wrapped = b.wrap_section_page(sec_html, css).replace(
                 "</body>", MEASURE_JS + "</body>", 1)
             Path(page).write_text(wrapped, encoding="utf-8")
             nodes = extract_layout(dump_dom(page, browser))

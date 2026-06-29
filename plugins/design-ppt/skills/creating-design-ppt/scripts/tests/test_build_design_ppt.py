@@ -101,6 +101,48 @@ def test_build_end_to_end(tmp_path):
     assert "표지 노트" in prs.slides[0].notes_slide.notes_text_frame.text
 
 
+def test_assign_page_numbers_skips_cover():
+    secs = b.split_sections(SAMPLE)  # 표지 + 본문
+    assert b.assign_page_numbers(secs) == [None, "1 / 1"]
+
+
+def test_assign_page_numbers_honors_off_attr():
+    html = SAMPLE.replace('data-label="본문"', 'data-label="본문" data-page-number="off"')
+    secs = b.split_sections(html)
+    # 표지 제외 + off 제외 -> 번호 대상 0개
+    assert b.assign_page_numbers(secs) == [None, None]
+
+
+def test_assign_page_numbers_sequential_total():
+    one = '<section style="width:1920px;height:1080px;background:#f5f7fa;">X</section>'
+    secs = b.split_sections("<body>" + (one * 4) + "</body>")
+    # 첫 장(표지)만 제외, 나머지 3장은 1~3 / 3
+    assert b.assign_page_numbers(secs) == [None, "1 / 3", "2 / 3", "3 / 3"]
+
+
+def test_inject_page_number_inserts_before_close():
+    secs = b.split_sections(SAMPLE)
+    out = b.inject_page_number(secs[1]["html"], secs[1]["attrs"], "1 / 1")
+    assert "1 / 1" in out
+    assert 'data-ppt="text"' in out
+    assert out.rstrip().endswith("</section>")
+    # 번호 div 는 닫는 태그 '앞'에 들어가야 한다.
+    assert out.index("1 / 1") < out.rindex("</section>")
+
+
+def test_inject_page_number_none_is_noop():
+    secs = b.split_sections(SAMPLE)
+    assert b.inject_page_number(secs[0]["html"], secs[0]["attrs"], None) == secs[0]["html"]
+
+
+def test_inject_page_number_dark_vs_light_color():
+    secs = b.split_sections(SAMPLE)  # [0]=navy 표지, [1]=paper 본문
+    dark = b.inject_page_number(secs[0]["html"], secs[0]["attrs"], "1 / 1")
+    light = b.inject_page_number(secs[1]["html"], secs[1]["attrs"], "1 / 1")
+    assert "#9fb2d4" in dark      # 밝은 글자색 (네이비 위)
+    assert "#9aa6b8" in light     # 슬레이트 글자색 (페이퍼 위)
+
+
 def test_parse_args_defaults_to_image():
     deck, out, mode = b.parse_args(["deck.html", "제목 v1.0.pptx"])
     assert deck == "deck.html" and out == "제목 v1.0.pptx" and mode == "image"
