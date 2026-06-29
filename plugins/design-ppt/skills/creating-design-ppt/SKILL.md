@@ -95,6 +95,8 @@ The same `deck.html` builds two ways — pick per deliverable:
 | Need | Do |
 |------|----|
 | Slide archetypes | `assets/sections/*.html` |
+| 전체 템플릿 미리보기 (브라우저로 열기) | `assets/templates-gallery.html` |
+| 갤러리 재생성 (아키타입 수정 후) | `python scripts/build_gallery.py` |
 | Design tokens | `assets/design-tokens.md` |
 | Build deck (native, **기본·편집 가능**) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` |
 | Build deck (image, 픽셀 완벽·편집 불가) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` |
