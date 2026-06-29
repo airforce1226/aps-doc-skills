@@ -1,7 +1,7 @@
 {
   "name": "design-ppt",
   "description": "Build an APS-Brand-Presentation-System HTML deck into a Korean .pptx (each <section> = one 1920×1080 slide). Default output is editable PowerPoint native objects (textboxes/tables/shapes) via headless-Chrome layout measurement; --mode image bakes pixel-faithful screenshots instead. 14 APS archetypes. Enforces IT전략팀 team rules.",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "author": {
     "name": "airforce1226",
     "email": "dhkim3@apsystems.co.kr"
