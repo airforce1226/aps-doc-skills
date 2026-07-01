@@ -135,6 +135,10 @@ def test_add_table_native_with_header_and_total(tmp_path):
     assert str(tbl.cell(2, 0).fill.fore_color.rgb) == "0B3FD1"
     neg_run = tbl.cell(2, 1).text_frame.paragraphs[0].runs[0]
     assert str(neg_run.font.color.rgb) == "C0392B"
+    # cell content is vertically centered (PowerPoint 텍스트 맞춤 > 중간)
+    from pptx.enum.text import MSO_ANCHOR
+    assert hdr.vertical_anchor == MSO_ANCHOR.MIDDLE
+    assert tbl.cell(1, 0).vertical_anchor == MSO_ANCHOR.MIDDLE
 
 
 def test_add_table_empty_rows_returns_none(tmp_path):

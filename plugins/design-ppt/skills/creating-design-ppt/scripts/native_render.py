@@ -363,6 +363,8 @@ def _cell_text(cell, text, *, color, bold, align, size_pt):
     cell.margin_left = cell.margin_right = _CELL_MARGIN
     tf = cell.text_frame
     tf.word_wrap = True
+    # vertically center cell content (PowerPoint 텍스트 맞춤 > 중간)
+    cell.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]
     p.alignment = align
     run = p.add_run()
