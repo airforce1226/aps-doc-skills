@@ -18,30 +18,32 @@ optional **image mode** (`--mode image`) bakes pixel-faithful screenshots instea
 **Core principle:** The HTML/CSS is the source of truth; the `.pptx` is its render.
 Never invent facts — mark unknowns `(미정 — 추후 확정)`.
 
-## Output modes (이미지 vs 네이티브)
+## Output modes (image vs native)
 
 The same `deck.html` builds two ways — pick per deliverable:
 
-| 모드 | 명령 | 특성 | 언제 |
-|------|------|------|------|
-| 네이티브 (**기본** — `/design-ppt`가 사용) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` | 텍스트·표·도형이 **편집 가능한 PowerPoint 네이티브 개체** · 차트/로고 등 일부 장식은 래스터 폴백 | 받는 사람이 PowerPoint에서 직접 고쳐야 할 때 (대부분) |
-| 이미지 (opt-in) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` | 픽셀 100% 충실 · **편집 불가**(슬라이드는 이미지, 원문은 발표자 노트) | 인쇄·배포용 픽셀 완벽 최종본 |
+| Mode | Command | Traits | When |
+|------|---------|--------|------|
+| Native (**default** — used by `/design-ppt`) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` | Text/tables/shapes become **editable PowerPoint native objects**; some decorations (charts/logos) fall back to raster | When the recipient must edit it directly in PowerPoint (most cases) |
+| Image (opt-in) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` | Pixel-perfect 100% fidelity; **not editable** (slides are images, original text in speaker notes) | Print/distribution final, pixel-perfect |
 
-네이티브 모드는 같은 `deck.html`을 헤드리스 Chrome `--dump-dom`으로 **측정**해 각 요소의
-좌표·스타일을 읽고 python-pptx 네이티브 개체로 재배치한다(`scripts/native_render.py`).
-빌드 끝에 슬라이드별 `native=/raster=` 리포트를 출력해 편집 가능성과 폴백 위치를 보여준다.
-색은 `assets/design-tokens.md` 팔레트로 스냅되고, 폰트는 맑은 고딕, 팀 규칙(author=IT전략팀·
-대외비 배지·noProof 노트)은 두 모드 공통이다.
+Native mode **measures** the same `deck.html` via headless Chrome `--dump-dom`,
+reads each element's coordinates/styles, and re-lays them out as python-pptx native
+objects (`scripts/native_render.py`). At the end of the build it prints a per-slide
+`native=/raster=` report showing what is editable and where it fell back. Colors are
+snapped to the `assets/design-tokens.md` palette, the font is Malgun Gothic, and the
+team rules (author=IT전략팀, classification badge, noProof notes) apply in both modes.
 
-**언제 무엇이 래스터로 떨어지나:** `conic-gradient` 도넛 차트, 그라데이션 로고(SVG) 등
-네이티브로 재현 불가한 장식만 그 영역의 이미지로 폴백한다(작업지시서 §5.7 철학). 그 외
-배경·박스·룰·표·KPI 숫자·막대 차트는 모두 편집 가능한 네이티브 개체로 생성된다.
-재현 불가 요소를 새로 추가할 때는 해당 HTML에 `data-ppt="raster"`를 붙이면 명시적으로
-래스터 처리된다(예: `assets/sections/09-charts.html`의 도넛).
+**What falls back to raster:** only decorations that cannot be reproduced natively —
+`conic-gradient` donut charts, gradient logos (SVG), etc. — are rasterized to an image
+of that region (work-order §5.7 philosophy). Everything else (backgrounds, boxes,
+rules, tables, KPI numbers, bar charts) is generated as editable native objects.
+When adding a new non-reproducible element, tag its HTML with `data-ppt="raster"` to
+rasterize it explicitly (e.g. the donut in `assets/sections/09-charts.html`).
 
 ## When to Use
 
-- "이 디자인으로 PPT 만들어줘", "APS 브랜드 슬라이드 / APS 템플릿 보고서를 .pptx로"
+- "Make a PPT in this design", "an APS-brand slide / APS-template report as .pptx"
 - The APS-brand **designed** deck is the deliverable, laid out via the HTML archetypes.
   Default output is editable native objects; add `--mode image` only when pixel-perfect
   screenshots are required. (For a structure-first native deck authored without the HTML
@@ -49,28 +51,35 @@ The same `deck.html` builds two ways — pick per deliverable:
 
 ## Workflow
 
-1. **Gather content** — report type + reader (임원/실무); interview or read a draft.
-   Never invent unknowns → `(미정 — 추후 확정)`.
-   **보안 분류 = 기본 "대외비" (묻지 않는다):** APS 사내 보고서는 모두 대외비이므로 별도로 묻지 말고
-   **모든 슬라이드에 "대외비" 배지를 기본 적용**한다. 사용자가 **명시적으로** 다른 등급(기밀/대내한/내부용)
-   이나 "공개(배지 없음)"를 요청한 경우에만 그에 맞춰 변경한다.
+1. **Gather content** — report type + reader (executive/working-level); interview or
+   read a draft. Never invent unknowns → `(미정 — 추후 확정)`.
+   **Security classification = default "대외비" (do not ask):** all APS internal
+   reports are 대외비, so do not ask separately — apply the **"대외비" badge to every
+   slide by default**. Change it only when the user **explicitly** requests another
+   grade (기밀/대내한/내부용) or "공개" (no badge).
+   **Cover/closing slides = always ask (when multi-slide):** if the deck is **2+
+   slides**, **before** assembling deck.html, ask the user whether to include the cover
+   slide (`01-cover.html`) and the closing slide (`13-closing.html`), and apply per their
+   answer — never add or omit them arbitrarily. For a single-slide deck, build only the
+   body and do not ask.
 2. **Assemble `deck.html`** — copy snippets from `assets/sections/` into one file,
    in order. Replace every `[[...]]` placeholder with real content and write each
    `data-speaker-notes`. Follow `assets/design-tokens.md`; the shared `assets/base.css`
    is injected automatically at build time. New layouts must reuse the tokens
    (Navy `#0b1b3a` / Paper `#f5f7fa` / APS Blue `#0b3fd1` / Brand Gradient
-   `#BED600→#2BA6CB` / Malgun Gothic). 14개 아키타입이 `assets/sections/`에 있다.
-   `assets/sections/_classification.html` 배지("대외비")를 **모든** `<section>`의 맨 앞 자식으로
-   기본 배치한다(부모 section 에 `position:relative` 필요). 다른 등급을 명시받은 경우에만 텍스트를 교체한다.
-3. **Build (기본: 편집 가능 네이티브)** —
+   `#BED600→#2BA6CB` / Malgun Gothic). The 14 archetypes are in `assets/sections/`.
+   Place the `assets/sections/_classification.html` badge ("대외비") as the **first
+   child** of **every** `<section>` by default (the parent section needs
+   `position:relative`). Replace the text only when another grade is explicitly given.
+3. **Build (default: editable native)** —
    `python scripts/build_design_ppt.py deck.html "<제목> v1.0.pptx" --mode native`
-   빌드 끝의 `native=/raster=` 리포트로 편집 가능성·폴백 위치를 확인한다.
-   픽셀 완벽 이미지본이 필요하면 `--mode image`로 빌드한다(또는 두 개 다 산출).
+   Check the closing `native=/raster=` report for editability and fallback locations.
+   If a pixel-perfect image deck is needed, build with `--mode image` (or produce both).
 4. **Verify** — reopen with python-pptx; confirm slide count and
-   `core_properties.author == "IT전략팀"`. 네이티브 모드면 텍스트/표/도형이 **picture가 아닌
-   실제 개체**인지(예: `shape.has_text_frame` / `has_table`) 확인한다. 기본적으로
-   **모든** 슬라이드에 "대외비" 배지가 있는지 확인한다(사용자가 공개를 명시한 경우만 예외).
-   (슬라이드 본문·표의 모든 텍스트 run + 노트가 빌드 시 `noProof` 자동 처리됨).
+   `core_properties.author == "IT전략팀"`. In native mode, confirm text/tables/shapes are
+   **real objects, not pictures** (e.g. `shape.has_text_frame` / `has_table`). By default,
+   confirm **every** slide has the "대외비" badge (except when the user explicitly chose
+   공개). (All text runs in slide bodies/tables + notes are auto-set to `noProof` at build.)
 5. **Report done** — give the file path and slide count.
 
 ## Team Rules (enforced — do not deviate)
@@ -80,10 +89,11 @@ The same `deck.html` builds two ways — pick per deliverable:
 | Author = **IT전략팀** (never a person's name) | `build_design_ppt.py` hard-codes `core_properties.author`. |
 | Filename: spaces, **no underscores**, version suffix last | e.g. `착수 보고서 v1.0.pptx`. Pass this exact path to the script. |
 | Don't invent unknowns | Use `(미정 — 추후 확정)` in the slide text. |
-| **개조식 작성 (구어체 금지)** | 슬라이드 본문은 **명사형 종결**의 개조식으로 쓴다. `~있었습니다/~합니다/~됩니다` 같은 구어체(합쇼체) 종결어미 금지 → `~잔존/~점유/~정상화` 처럼 명사형으로 맺는다. |
-| **보안 분류 = 기본 대외비 (묻지 않음)** | `_classification.html`("대외비") 배지를 **전 슬라이드에 기본 배치**. 사용자가 다른 등급/공개를 명시할 때만 변경. |
-| 보안 배지 = 빨강 **테두리만·정중앙** | `_classification.html` 배지는 채움 없이 적색 테두리(2px)·적색 글자, 텍스트는 박스 정중앙. 네이티브 빌드 시 `native_render.py`가 테두리 박스 + 중앙 정렬 텍스트로 생성한다(채움 X). |
-| 맞춤법 검사 비활성(noProof) | `native_render.py`(슬라이드 본문·표 **모든** 텍스트 run)와 `build_design_ppt.py`(발표자 노트)가 `lang="ko-KR"` + `noProof="1"` 설정 (검토>언어>교정 언어 설정>맞춤법 검사 안 함). |
+| **개조식 작성 (no conversational tone)** | Slide bodies use **noun-form endings** (개조식). No 합쇼체 endings such as `~있었습니다/~합니다/~됩니다`; end with noun forms like `~잔존/~점유/~정상화`. |
+| **Classification = default 대외비 (not asked)** | Place the `_classification.html` ("대외비") badge on **all slides by default**. Change only when the user specifies another grade/공개. |
+| Classification badge = red **border only, centered** | The `_classification.html` badge has no fill — red border (2px), red text, text centered in the box. In native builds, `native_render.py` generates a bordered box + centered text (no fill). |
+| Disable spellcheck (noProof) | `native_render.py` (**all** text runs in slide bodies/tables) and `build_design_ppt.py` (speaker notes) set `lang="ko-KR"` + `noProof="1"` (검토>언어>교정 언어 설정>맞춤법 검사 안 함). |
+| Cover/closing = ask via Q&A when multi-slide | If the deck is **2+ slides**, before assembling deck.html ask the user whether to include the cover (`01-cover.html`) / closing (`13-closing.html`) slides, and apply per their answer. No arbitrary add/omit (single-slide decks are not asked). |
 
 ## Prerequisites
 
@@ -97,14 +107,14 @@ The same `deck.html` builds two ways — pick per deliverable:
 | Need | Do |
 |------|----|
 | Slide archetypes | `assets/sections/*.html` |
-| 전체 템플릿 미리보기 (브라우저로 열기) | `assets/templates-gallery.html` |
-| 갤러리 재생성 (아키타입 수정 후) | `python scripts/build_gallery.py` |
+| Preview all templates (open in browser) | `assets/templates-gallery.html` |
+| Regenerate gallery (after editing archetypes) | `python scripts/build_gallery.py` |
 | Design tokens | `assets/design-tokens.md` |
-| Build deck (native, **기본·편집 가능**) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` |
-| Build deck (image, 픽셀 완벽·편집 불가) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` |
-| 재현 불가 요소를 래스터로 | 해당 HTML 요소에 `data-ppt="raster"` 부여 |
+| Build deck (native, **default, editable**) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode native` |
+| Build deck (image, pixel-perfect, not editable) | `python scripts/build_design_ppt.py deck.html "제목 v1.0.pptx" --mode image` |
+| Rasterize a non-reproducible element | add `data-ppt="raster"` to that HTML element |
 | Mark unknown | put `(미정 — 추후 확정)` in the text |
-| 보안 분류 배지 | `assets/sections/_classification.html` 를 각 section 맨 앞에 |
+| Classification badge | put `assets/sections/_classification.html` first in each section |
 | Browser not found | set `DESIGN_PPT_BROWSER` to chrome.exe/msedge.exe |
 
 ## Common Mistakes
@@ -112,8 +122,11 @@ The same `deck.html` builds two ways — pick per deliverable:
 - Leaving `[[...]]` placeholders in the final deck.
 - Underscores in the filename or a missing `v1.0` suffix.
 - A person's name as author instead of IT전략팀.
-- 대외비/기밀 등 보안 분류 배지를 일부 슬라이드에서만 넣고 누락(전 슬라이드 일관 배치).
-- `--mode image`로 빌드해 놓고 PowerPoint에서 텍스트가 안 고쳐진다고 하기 — 이미지 모드는
-  의도적으로 편집 불가다(기본 네이티브 모드를 쓰거나 HTML을 고쳐 재빌드).
-- 네이티브 모드 결과에서 차트/로고가 이미지인 것을 버그로 오인 — 의도된 래스터 폴백이다
-  (편집 대상은 텍스트·표·도형·배경). 막대 차트는 네이티브, 도넛만 래스터.
+- Putting the classification badge (대외비/기밀 etc.) on only some slides (place consistently on all).
+- In a multi-slide deck, adding or omitting the cover (`01-cover.html`) / closing
+  (`13-closing.html`) slides without asking the user (multi-slide always uses Q&A).
+- Building with `--mode image` and then complaining text can't be edited in PowerPoint —
+  image mode is intentionally non-editable (use the default native mode, or edit the HTML and rebuild).
+- Mistaking a chart/logo in native output for a bug because it's an image — that is the
+  intended raster fallback (the editable targets are text/tables/shapes/backgrounds). Bar
+  charts are native, only the donut is raster.
