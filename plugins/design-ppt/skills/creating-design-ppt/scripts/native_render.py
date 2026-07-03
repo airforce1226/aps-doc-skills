@@ -113,7 +113,10 @@ MEASURE_JS = r"""
     var bw=parseFloat(cs.borderTopWidth)||0;
     var uniform = bw>0 && cs.borderTopWidth===cs.borderRightWidth
       && cs.borderTopWidth===cs.borderBottomWidth && cs.borderTopWidth===cs.borderLeftWidth;
-    return {role:role, x:r.left, y:r.top, w:r.width, h:r.height,
+    // z-index of positioned overlays (badge/watermark) so they paint on top of
+    // filled siblings drawn later in DOM order. 'auto'/non-positioned -> 0 (no change).
+    var z=parseInt(cs.zIndex,10); if(isNaN(z)) z=0;
+    return {role:role, x:r.left, y:r.top, w:r.width, h:r.height, z:z,
       color:cs.color, bg:cs.backgroundColor, grad:cs.backgroundImage,
       align:cs.textAlign, font:firstFont(cs.fontFamily), sizePx:parseFloat(cs.fontSize),
       weight:cs.fontWeight, ls:cs.letterSpacing, radius:parseFloat(cs.borderTopLeftRadius)||0,
@@ -363,8 +366,6 @@ def _cell_text(cell, text, *, color, bold, align, size_pt):
     cell.margin_left = cell.margin_right = _CELL_MARGIN
     tf = cell.text_frame
     tf.word_wrap = True
-    # vertically center cell content (PowerPoint 텍스트 맞춤 > 중간)
-    cell.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]
     p.alignment = align
     run = p.add_run()
@@ -431,9 +432,11 @@ def add_raster(slide, node, section_png, tmp_dir, idx):
 
 def render_slide(slide, nodes, section_png, tmp_dir, si):
     counts = {"native": 0, "raster": 0}
-    # Boxes/rules first (background layer), then raster, then tables/text on top.
+    # Draw by CSS stacking order first (so z-indexed overlays like the 대외비 badge
+    # paint on top of a full-bleed header), then within a layer: boxes/rules first
+    # (background), then raster, then tables/text on top.
     order = {"box": 0, "rule": 1, "raster": 2, "table": 3, "text": 4}
-    for node in sorted(nodes, key=lambda n: order.get(n["role"], 5)):
+    for node in sorted(nodes, key=lambda n: (n.get("z", 0), order.get(n["role"], 5))):
         role = node["role"]
         if role == "box":
             add_box(slide, node); counts["native"] += 1
@@ -477,6 +480,13 @@ def build_native(deck_path, out_path, css=None, browser=None):
                 "</body>", MEASURE_JS + "</body>", 1)
             Path(page).write_text(wrapped, encoding="utf-8")
             nodes = extract_layout(dump_dom(page, browser))
+            over = [n for n in nodes
+                    if n["x"] + n["w"] > W + 1 or n["y"] + n["h"] > H + 1
+                    or n["x"] < -1 or n["y"] < -1]
+            if over:
+                print("  ⚠ Slide %02d: %d개 요소가 슬라이드(%dx%d) 밖에 있습니다 "
+                      "— deck.html의 해당 <section> 높이/여백을 줄여 1080px 안에 맞추세요."
+                      % (si + 1, len(over), W, H))
             section_png = None
             if any(n["role"] == "raster" for n in nodes):
                 section_png = os.path.join(tmp, "slide_%02d.png" % si)
